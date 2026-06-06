@@ -1,0 +1,79 @@
+/* Design Tokens */
+:root {
+  --bg: #030407;
+  --accent: #e8a23a;
+  --text-primary: #ffffff;
+  --text-muted: rgba(255,255,255,0.7);
+  --panel-bg: rgba(3,4,7,0.85);
+  --panel-border: rgba(255,255,255,0.05);
+}
+
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background-color: var(--bg);
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--text-primary);
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', 'JetBrains+Mono', monospace;
+}
+
+/* minimal range slider */
+.soc-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent) 0%, rgba(255,255,255,0.06) 100%);
+  outline: none;
+}
+
+.soc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid #0a0c10;
+  box-shadow: 0 0 6px var(--accent);
+  cursor: pointer;
+}
+
+.soc-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid #0a0c10;
+  box-shadow: 0 0 6px var(--accent);
+  cursor: pointer;
+}
+
+/* Custom minimal scrollbar for technical panels */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(232, 162, 58, 0.4);
+}
