@@ -20,6 +20,79 @@ function getUtil(id: string, mode: SocMode): number {
   return table ? table[mode] : 0.1;
 }
 
+function DieInterconnects({ opacity }: { opacity: number }) {
+  const buses = useMemo(() => {
+    const list = [];
+    // Horizontal data buses
+    for (let z = -7; z <= 7; z += 3.5) {
+      list.push({ start: [-9.5, 0.015, z], end: [9.5, 0.015, z], color: "#d4af37", width: 0.035 });
+    }
+    // Vertical data buses
+    for (let x = -9; x <= 9; x += 4.5) {
+      list.push({ start: [x, 0.015, -7.5], end: [x, 0.015, 7.5], color: "#b87333", width: 0.025 });
+    }
+    
+    // CPU to SLC local buses
+    for (let i = -1.2; i <= 1.2; i += 0.4) {
+      list.push({ start: [-2.5 + i, 0.016, -2.0], end: [-2.5 + i, 0.016, 2.0], color: AMBER, width: 0.018 });
+    }
+    // GPU to SLC local buses
+    for (let i = -1.2; i <= 1.2; i += 0.4) {
+      list.push({ start: [3.5 + i, 0.016, -2.0], end: [3.5 + i, 0.016, 2.0], color: AMBER, width: 0.018 });
+    }
+    
+    // Diagonal corner tracks
+    list.push({ start: [-8.0, 0.015, -6.0], end: [-6.0, 0.015, -4.0], color: "#d4af37", width: 0.025 });
+    list.push({ start: [8.0, 0.015, -6.0], end: [6.0, 0.015, -4.0], color: "#d4af37", width: 0.025 });
+    list.push({ start: [-8.0, 0.015, 6.0], end: [-6.0, 0.015, 4.0], color: "#d4af37", width: 0.025 });
+    list.push({ start: [8.0, 0.015, 6.0], end: [6.0, 0.015, 4.0], color: "#d4af37", width: 0.025 });
+    
+    return list;
+  }, []);
+
+  return (
+    <group>
+      {buses.map((bus, idx) => {
+        const dx = bus.end[0] - bus.start[0];
+        const dz = bus.end[2] - bus.start[2];
+        const len = Math.sqrt(dx * dx + dz * dz);
+        const angle = Math.atan2(dz, dx);
+        const cx = (bus.start[0] + bus.end[0]) / 2;
+        const cz = (bus.start[2] + bus.end[2]) / 2;
+        return (
+          <mesh key={idx} position={[cx, bus.start[1], cz]} rotation={[0, -angle, 0]}>
+            <boxGeometry args={[len, 0.005, bus.width]} />
+            <meshStandardMaterial
+              color={bus.color}
+              metalness={0.9}
+              roughness={0.2}
+              transparent
+              opacity={0.35 * opacity}
+              emissive={bus.color === AMBER ? AMBER : undefined}
+              emissiveIntensity={bus.color === AMBER ? 0.35 : undefined}
+            />
+          </mesh>
+        );
+      })}
+      
+      {/* Grid of micro-vias on the die */}
+      {Array.from({ length: 12 }).map((_, i) =>
+        Array.from({ length: 10 }).map((_, j) => {
+          const x = -10.0 + i * 1.8;
+          const z = -8.0 + j * 1.7;
+          if (Math.abs(x) < 1.0 && Math.abs(z) < 1.0) return null;
+          return (
+            <mesh key={`${i}-${j}`} position={[x, 0.015, z]}>
+              <cylinderGeometry args={[0.03, 0.03, 0.01, 6]} />
+              <meshStandardMaterial color="#d4af37" metalness={0.9} roughness={0.1} transparent opacity={0.4 * opacity} />
+            </mesh>
+          );
+        })
+      )}
+    </group>
+  );
+}
+
 /* =========================================================================
    DIE SUBSTRATE & BASE
    ========================================================================= */
@@ -74,16 +147,19 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
           />
         </mesh>
       ) : (
-        <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[dieW - 0.3, dieD - 0.3]} />
-          <meshStandardMaterial 
-            color="#060910" 
-            metalness={0.9} 
-            roughness={0.15} 
-            transparent 
-            opacity={opacity} 
-          />
-        </mesh>
+        <>
+          <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[dieW - 0.3, dieD - 0.3]} />
+            <meshStandardMaterial 
+              color="#060910" 
+              metalness={0.9} 
+              roughness={0.15} 
+              transparent 
+              opacity={opacity} 
+            />
+          </mesh>
+          <DieInterconnects opacity={opacity} />
+        </>
       )}
 
       {/* Scribe-line amber border */}
@@ -216,6 +292,58 @@ function isFocused(blockId: string, level: number): boolean {
   return PRIMARY_BLOCK_FOR_LEVEL[level] === blockId;
 }
 
+function getStaggeredT(blockId: string, manualT: number): number {
+  const block = BLOCKS.find((b) => b.id === blockId);
+  if (!block) return manualT;
+  const cx = block.cx;
+  const cz = block.cz;
+  const dist = Math.sqrt(cx * cx + cz * cz);
+  const maxDist = 11.5; // normalized center-to-corner maximum distance
+  const normDist = Math.min(1.0, dist / maxDist);
+  
+  // Center-outward explosion delay
+  const delay = normDist * 0.45;
+  const localT = Math.max(0, Math.min(1, (manualT - delay) / (1.0 - delay)));
+  
+  // Custom ease-in-out curve
+  return localT * localT * (3 - 2 * localT);
+}
+
+function getTargetBlockT(blockId: string, levelFloat: number, manualT: number): number {
+  // Levels 1-3: manual explode slider drives everything
+  if (levelFloat <= 3.3) {
+    return getStaggeredT(blockId, manualT);
+  }
+
+  // Level 10: pipeline stage focus on cpu-big
+  if (levelFloat >= 9.5) {
+    if (blockId === "cpu-big") {
+      const progressTo10 = Math.max(0, Math.min(1, (levelFloat - 9.0) / 1.0));
+      return progressTo10 * 0.35;
+    }
+    return 0.0;
+  }
+
+  // Narrative spotlight levels 4-9
+  let focusLevel = -1;
+  for (const [lvlStr, id] of Object.entries(PRIMARY_BLOCK_FOR_LEVEL)) {
+    const lvl = parseInt(lvlStr);
+    if (id === blockId && lvl >= 4 && lvl <= 9) {
+      focusLevel = lvl;
+      break;
+    }
+  }
+
+  if (focusLevel !== -1) {
+    const dist = Math.abs(levelFloat - focusLevel);
+    // Smooth bell curve around focusLevel
+    const factor = Math.max(0, 1.0 - dist);
+    return factor * factor * (3 - 2 * factor); 
+  }
+
+  return 0.0;
+}
+
 export function Scene({
   t,
   showLabels,
@@ -238,16 +366,6 @@ export function Scene({
     return { cx: selectedBlock.cx, cz: selectedBlock.cz, h: selectedBlock.h };
   }, [selectedBlock]);
 
-  // Auto-compute focused block coords for camera targeting (levels 4-10)
-  // Uses the LIFTED position so camera aims at the block's final elevated top face
-  const autoFocusCoords = useMemo(() => {
-    if (level < 4) return null;
-    const primaryId = PRIMARY_BLOCK_FOR_LEVEL[level];
-    const block = primaryId ? BLOCKS.find((b) => b.id === primaryId) : null;
-    if (!block) return null;
-    return { cx: block.cx, cz: block.cz, h: block.lift + block.h };
-  }, [level]);
-
   // Transition values for the chip components
   // At levelFloat = 1.0, progress = 0 (chip is low and invisible)
   // At levelFloat = 2.0, progress = 1 (chip is centered and visible)
@@ -268,7 +386,7 @@ export function Scene({
         <Lightformer intensity={0.8} color="#ffb878" position={[0, 5, -14]} scale={[12, 4, 1]} />
       </Environment>
 
-      <CameraController levelFloat={levelFloat} selectedBlockCoords={autoFocusCoords ?? selectedBlockCoords} />
+      <CameraController levelFloat={levelFloat} selectedBlockCoords={selectedBlockCoords} />
 
       <group onPointerMissed={() => setSelected(null)}>
         {/* Layer 1: Computer Shell (slides down & fades out) */}
@@ -286,7 +404,7 @@ export function Scene({
                 const isLevelSpotlight = level >= 4 && level <= 9;
                 const isLevelPipeline = level === 10;
 
-                let blockT = t;
+                let blockT = getTargetBlockT(b.id, levelFloat, t);
                 let blockSelected = selected === b.id;
                 let blockDimmed = selected !== null && selected !== b.id;
 
@@ -294,21 +412,17 @@ export function Scene({
                   if (isBlockFocus) {
                     blockSelected = true;
                     blockDimmed = false; // Focused blocks are never dimmed
-                    blockT = 1.0; // Full lift so article card on top is clearly visible
                   } else {
                     blockSelected = false;
                     blockDimmed = true;
-                    blockT = 0.0;
                   }
                 } else if (isLevelPipeline) {
                   if (b.id === "cpu-big") {
                     blockSelected = true;
                     blockDimmed = false;
-                    blockT = 0.35; // Lift slightly to support pipeline stage grids
                   } else {
                     blockSelected = false;
                     blockDimmed = true;
-                    blockT = 0.0;
                   }
                 }
 

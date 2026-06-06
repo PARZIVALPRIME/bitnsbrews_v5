@@ -217,7 +217,7 @@ This is Layer 10 (Execution Pipeline) standing on top of the Performance CPU.
   const htmlScale = 0.022;
 
   return (
-    <group position={[0, blockH + 0.12, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <group position={[0, blockH + 0.35, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       {/* 3D Glass card backing */}
       <mesh receiveShadow castShadow>
         <planeGeometry args={[375 * htmlScale, 265 * htmlScale]} />

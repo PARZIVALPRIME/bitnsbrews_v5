@@ -6,6 +6,7 @@ import type { Block } from "./data";
 import { useQuality } from "./quality";
 import { ThermalShader } from "./shaders";
 import { BlockArticle } from "./BlockArticle";
+import { BlockMicroArchitecture } from "./BlockMicroArchitecture";
 
 const AMBER = "#e8a23a";
 const AMBER_C = new THREE.Color(AMBER);
@@ -58,6 +59,31 @@ export function SocBlock({
 
   const edgeStrip = block.detail === "lpddr" || block.detail === "ioring";
   const w = Math.max(0.1, block.w - (edgeStrip ? 0 : GAP));
+
+  // Pseudo-random deterministic factors for rotational wobble based on block ID
+  const hashX = useMemo(() => {
+    let h = 0;
+    for (let i = 0; i < block.id.length; i++) {
+      h = (h << 5) - h + block.id.charCodeAt(i);
+    }
+    return (h % 10) / 10 >= 0.5 ? 1 : -1;
+  }, [block.id]);
+
+  const hashZ = useMemo(() => {
+    let h = 0;
+    for (let i = 0; i < block.id.length; i++) {
+      h = (h << 3) - h + block.id.charCodeAt(i);
+    }
+    return (h % 10) / 10 >= 0.5 ? 1 : -1;
+  }, [block.id]);
+
+  const hashRotY = useMemo(() => {
+    let h = 0;
+    for (let i = 0; i < block.id.length; i++) {
+      h = (h << 7) - h + block.id.charCodeAt(i);
+    }
+    return ((h % 10) / 10 - 0.5) * 0.15; // subtle yaw spin
+  }, [block.id]);
   const d = Math.max(0.1, block.d - (edgeStrip ? 0 : GAP));
   const h = block.h;
   const cx = block.cx;
@@ -106,7 +132,16 @@ export function SocBlock({
       return;
     }
 
-    if (liftGroup.current) liftGroup.current.position.y = y + microLift + hoverLift + selectLift;
+    if (liftGroup.current) {
+      liftGroup.current.position.y = y + microLift + hoverLift + selectLift;
+      
+      // Calculate organic mid-air wobble tilt (peaks at 0.5 progress)
+      const hProgress = cur.current;
+      const tiltFactor = Math.sin(hProgress * Math.PI);
+      liftGroup.current.rotation.x = tiltFactor * 0.08 * hashX;
+      liftGroup.current.rotation.z = tiltFactor * 0.08 * hashZ;
+      liftGroup.current.rotation.y = hProgress * hashRotY;
+    }
 
     if (rod.current) {
       const total = y + microLift + hoverLift + selectLift;
@@ -210,24 +245,36 @@ export function SocBlock({
           </Edges>
         </mesh>
 
-        {/* top cap */}
+        {/* top cap & micro-architecture details */}
         {visMode !== "thermal" && (
-          <mesh position={[0, h + 0.025, 0]} castShadow={!isMobile}>
-            <boxGeometry args={[Math.max(0.12, w - 0.08), 0.05, Math.max(0.12, d - 0.08)]} />
-            <meshStandardMaterial
-              ref={capMat}
-              color={block.base}
-              metalness={visMode === "logical" ? 0.95 : block.metalness + 0.05}
-              roughness={visMode === "logical" ? 0.15 : Math.max(0.15, block.roughness - 0.08)}
-              transparent={visMode === "logical" || dimmed}
-              opacity={dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1}
+          isMobile ? (
+            <mesh position={[0, h + 0.025, 0]} castShadow={!isMobile}>
+              <boxGeometry args={[Math.max(0.12, w - 0.08), 0.05, Math.max(0.12, d - 0.08)]} />
+              <meshStandardMaterial
+                ref={capMat}
+                color={block.base}
+                metalness={visMode === "logical" ? 0.95 : block.metalness + 0.05}
+                roughness={visMode === "logical" ? 0.15 : Math.max(0.15, block.roughness - 0.08)}
+                transparent={visMode === "logical" || dimmed}
+                opacity={dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1}
+              />
+              {!isMobile && (
+                <Edges threshold={15} scale={1.001}>
+                  <lineBasicMaterial color={AMBER} transparent opacity={dimmed ? 0.04 : 0.22} />
+                </Edges>
+              )}
+            </mesh>
+          ) : (
+            <BlockMicroArchitecture
+              block={block}
+              w={w}
+              d={d}
+              h={h}
+              dimmed={dimmed}
+              opacity={opacity}
+              utilization={modeUtilization}
             />
-            {!isMobile && (
-              <Edges threshold={15} scale={1.001}>
-                <lineBasicMaterial color={AMBER} transparent opacity={dimmed ? 0.04 : 0.22} />
-              </Edges>
-            )}
-          </mesh>
+          )
         )}
 
         {/* 3D Co-spatial Article Card on top face of block */}

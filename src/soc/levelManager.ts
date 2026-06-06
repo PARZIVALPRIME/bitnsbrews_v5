@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { BLOCKS } from "./data";
 
 export interface ZoomLevel {
   id: number;
@@ -124,6 +125,26 @@ export function getCameraParamsForLevel(
   return { position, target, fov };
 }
 
+export function getFocusedBlockCoordsForLevel(level: number): { cx: number; cz: number; h: number } | null {
+  const PRIMARY_BLOCK_FOR_LEVEL: Record<number, string> = {
+    4: "cpu-big",
+    5: "gpu",
+    6: "npu",
+    7: "modem",
+    8: "isp",
+    9: "slc",
+    10: "cpu-big",
+  };
+  const primaryId = PRIMARY_BLOCK_FOR_LEVEL[level];
+  if (!primaryId) return null;
+  const block = BLOCKS.find((b) => b.id === primaryId);
+  if (!block) return null;
+  
+  // Return coords using the block's narrative lift height (0.35 * lift for level 10, 1.0 * lift for others)
+  const liftHeight = level === 10 ? 0.35 * block.lift : block.lift;
+  return { cx: block.cx, cz: block.cz, h: liftHeight + block.h };
+}
+
 export function getCameraParamsInterpolated(
   levelFloat: number,
   selectedBlockCoords: { cx: number; cz: number; h: number } | null
@@ -132,8 +153,12 @@ export function getCameraParamsInterpolated(
   const targetLevel = Math.min(ZOOM_LEVELS.length, baseLevel + 1);
   const alpha = levelFloat - baseLevel;
 
-  const baseParams = getCameraParamsForLevel(baseLevel, selectedBlockCoords);
-  const targetParams = getCameraParamsForLevel(targetLevel, selectedBlockCoords);
+  // Retrieve focused coords specific to base and target levels to prevent coordinate jumps during transitions
+  const baseFocusCoords = selectedBlockCoords || getFocusedBlockCoordsForLevel(baseLevel);
+  const targetFocusCoords = selectedBlockCoords || getFocusedBlockCoordsForLevel(targetLevel);
+
+  const baseParams = getCameraParamsForLevel(baseLevel, baseFocusCoords);
+  const targetParams = getCameraParamsForLevel(targetLevel, targetFocusCoords);
 
   const position = new THREE.Vector3().lerpVectors(baseParams.position, targetParams.position, alpha);
   const target = new THREE.Vector3().lerpVectors(baseParams.target, targetParams.target, alpha);
