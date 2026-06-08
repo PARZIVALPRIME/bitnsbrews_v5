@@ -102,6 +102,16 @@ export const CHAPTERS = [
     description:
       "Information in motion. Instructions traverse Fetch → Decode → Rename → Dispatch → Issue → Execute → Retire — a choreography invisible to the programmer, fundamental to every computation.",
   },
+  {
+    level: 11,
+    id: "hub",
+    chapter: "11",
+    tag: "INDEX & DIRECTORY",
+    title: "The Hub",
+    subtitle: "Technical Index & Team Directory",
+    description:
+      "Welcome to the central hub. Browse all 9 general technical tracks, full articles, and meet the team behind the Bits'nBrews Digital Engineering Museum.",
+  },
 ];
 
 export const TOTAL = CHAPTERS.length;
