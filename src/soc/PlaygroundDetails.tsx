@@ -20,7 +20,7 @@ function SectionPad({
   h,
   color,
   edge,
-  inner = "#07090d",
+  inner: _inner = "#07090d",
   edgeOpacity = 0.65,
 }: {
   x: number;
@@ -36,20 +36,16 @@ function SectionPad({
 }) {
   const isMobile = useQuality() === "mobile";
   return (
-    <mesh position={[x, y + h / 2, z]} castShadow={!isMobile}>
+    // Micro-geometry never casts shadows — the parent block's silhouette already
+    // covers it. The recessed inner well was dropped too: it was a separate mesh
+    // per pad (~50 extra draw calls) for a barely-visible dark inset.
+    <mesh position={[x, y + h / 2, z]}>
       <boxGeometry args={[w, h, d]} />
       <meshStandardMaterial {...metal(color, 0.28)} />
       {!isMobile && (
         <Edges threshold={15} scale={1.001}>
           <lineBasicMaterial color={edge} transparent opacity={edgeOpacity} />
         </Edges>
-      )}
-      {/* recessed inner well — skipped on mobile to cut mesh count by ~half */}
-      {!isMobile && (
-        <mesh position={[0, h / 2 - 0.01, 0]}>
-          <boxGeometry args={[w * 0.78, Math.min(0.04, h * 0.35), d * 0.78]} />
-          <meshStandardMaterial {...metal(inner, 0.56)} />
-        </mesh>
       )}
     </mesh>
   );
@@ -163,9 +159,8 @@ function RibField({
     ref.current.instanceMatrix.needsUpdate = true;
   }, [data]);
 
-  const isMobile = useQuality() === "mobile";
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, data.length]} castShadow={!isMobile}>
+    <instancedMesh ref={ref} args={[undefined, undefined, data.length]}>
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial {...metal(color, 0.26)} />
     </instancedMesh>
@@ -221,7 +216,7 @@ function BumpField({
 
   const isMobile = useQuality() === "mobile";
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, data.length]} castShadow={!isMobile}>
+    <instancedMesh ref={ref} args={[undefined, undefined, data.length]}>
       <cylinderGeometry args={[1, 1, 1, isMobile ? 6 : 10]} />
       <meshStandardMaterial {...metal(color, 0.32)} />
     </instancedMesh>

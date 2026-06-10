@@ -1,10 +1,13 @@
-import { Suspense, useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
+import { PerformanceMonitor } from "@react-three/drei";
 import { QualityContext } from "./soc/quality";
 import { CHAPTERS, TOTAL } from "./chapters";
 import { getArticleForLevel, parseMarkdown } from "./chapterArticles";
 import { TRACKS, getTrackArticle } from "./trackArticles";
-import { ArticlePage } from "./ArticlePage";
+import { getTrackForBlock, getArticle } from "./articles";
+import { ArticleReader } from "./ArticleReader";
+
 import { PlaygroundOverlay } from "./soc/PlaygroundOverlay";
 
 interface SceneProps {
@@ -113,12 +116,30 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   const [subscribed, setSubscribed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [hubAtBottom, setHubAtBottom] = useState(false);
-  const [activeArticleTrack, setActiveArticleTrack] = useState<string | null>(null);
+
+  // ── Article gallery (Page 4) state ────────────────────────────────────────
+  const [readerArticleId, setReaderArticleId] = useState<string | null>(null);
+  const readerOpenRef = useRef(false);
+  useEffect(() => {
+    readerOpenRef.current = readerArticleId !== null;
+  }, [readerArticleId]);
+
   const [showPlayground, setShowPlayground] = useState(false);
 
   // Performance scaling settings
   const [perfMode, setPerfMode] = useState<"high" | "low">("high");
   const [autoDowngraded, setAutoDowngraded] = useState(false);
+
+  // Branded boot screen — covers shader compilation / first-frame jank.
+  const [booted, setBooted] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setBooted(true), 1400);
+    return () => clearTimeout(id);
+  }, []);
+
+  // Dynamic resolution: high mode starts at 1.5× and self-tunes against the
+  // measured frame rate, so strong GPUs stay crisp and weaker ones stay smooth.
+  const [dynamicDpr, setDynamicDpr] = useState(1.5);
 
   // 1. Hard hardware specs check (RAM & integrated GPU check) on mount
   useEffect(() => {
@@ -180,7 +201,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     setHubAtBottom(false);
     setSubscribed(false);
     setEmail("");
-    setActiveArticleTrack(null);
+
   }, [targetLevel]);
 
   // Track targetLevel in a ref to keep global listeners current without rebinding
@@ -208,16 +229,19 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     };
 
     const handleWheel = (e: WheelEvent) => {
+      // Article reader open: let it scroll natively, never navigate chapters.
+      if (readerOpenRef.current) return;
+
       const currentLvl = targetLevelRef.current;
-      
-      // On the final Hub page (Level 11), let the catalog container handle scrolling
-      // unless we are at the top and the user is scrolling UP, in which case we go back to level 10.
-      if (currentLvl === 11) {
+
+      if (currentLvl === 5) {
+        // On the final Hub page, let the catalog container handle scrolling
+        // unless we are at the top and the user is scrolling UP, in which case we go back.
         const container = document.getElementById("hub-catalog-container");
         if (container) {
           const isAtTop = container.scrollTop <= 0;
           const isScrollingUp = e.deltaY < 0;
-          
+
           if (isAtTop && isScrollingUp) {
             e.preventDefault();
           } else {
@@ -246,10 +270,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     };
 
     const handleKey = (e: KeyboardEvent) => {
+      if (readerOpenRef.current) return;
       const currentLvl = targetLevelRef.current;
-      
+
       // On the final Hub page, only let ArrowUp/PageUp capture navigation if we are at the top
-      if (currentLvl === 11) {
+      if (currentLvl === 5) {
         const container = document.getElementById("hub-catalog-container");
         if (container) {
           const isAtTop = container.scrollTop <= 0;
@@ -274,14 +299,16 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   }, []);
 
   // ── Smooth lerp: levelFloat → targetLevel (drives camera interpolation) ───
+  // Values are quantized to 0.02 steps: React then bails out of identical-state
+  // updates, so the heavy scene tree stops re-rendering the moment the value
+  // settles. The in-canvas camera/block lerps smooth over the steps.
   useEffect(() => {
     let raf: number;
     const ease = () => {
       setLevelFloat((prev) => {
         const diff = targetLevel - prev;
-        // Stop when close enough to avoid perpetual rAF
-        if (Math.abs(diff) < 0.001) return targetLevel;
-        return prev + diff * 0.10; // snappier transition
+        if (Math.abs(diff) < 0.02) return targetLevel; // snap & settle
+        return Math.round((prev + diff * 0.12) * 50) / 50;
       });
       raf = requestAnimationFrame(ease);
     };
@@ -289,8 +316,21 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     return () => cancelAnimationFrame(raf);
   }, [targetLevel]);
 
-  const currentChapter = CHAPTERS.find((c) => c.level === targetLevel) ?? CHAPTERS[3];
+  const currentChapter = CHAPTERS.find((c) => c.level === targetLevel) ?? CHAPTERS[CHAPTERS.length - 1];
   const SceneEl = SceneComp;
+
+  // On the Library page the die is the table of contents: clicking a block
+  // (or its floating track card) opens that track's article if published.
+  // Stable identity (useCallback) keeps memoized scene blocks from re-rendering.
+  const handleBlockSelect = useCallback((id: string | null) => {
+    setSelectedBlock(id);
+    if (id && targetLevelRef.current === 4) {
+      const track = getTrackForBlock(id);
+      if (track?.status === "published" && track.articleId) {
+        setReaderArticleId(track.articleId);
+      }
+    }
+  }, []);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#08090e] font-sans text-white select-none">
@@ -302,26 +342,46 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       <div className="absolute inset-0 z-1">
         <Canvas
           shadows={perfMode === "high"}
-          dpr={perfMode === "high" ? [1, 2] : 1}
+          dpr={perfMode === "high" ? dynamicDpr : 1}
           camera={{ position: [20, 16, 22], fov: 25 }}
-          gl={{ antialias: perfMode === "high", powerPreference: "high-performance" }}
+          gl={{ antialias: false, powerPreference: "high-performance", stencil: false }}
           className="absolute inset-0"
         >
           <QualityContext.Provider value={perfMode === "high" ? "desktop" : "mobile"}>
-            <Suspense fallback={null}>
-              <SceneEl
-                t={t}
-                showLabels={targetLevel === 3}
-                selected={selectedBlock}
-                setSelected={setSelectedBlock}
-                mode="Idle"
-                levelFloat={levelFloat}
-                visMode={visMode}
-              />
-            </Suspense>
+            <PerformanceMonitor
+              bounds={() => [48, 60]}
+              flipflops={4}
+              onIncline={() => setDynamicDpr((d) => Math.min(1.5, d + 0.25))}
+              onDecline={() => setDynamicDpr((d) => Math.max(1, d - 0.25))}
+              onFallback={() => setDynamicDpr(1)}
+            >
+              <Suspense fallback={null}>
+                <SceneEl
+                  t={t}
+                  showLabels={targetLevel === 3}
+                  selected={selectedBlock}
+                  setSelected={handleBlockSelect}
+                  mode="Idle"
+                  levelFloat={levelFloat}
+                  visMode={visMode}
+                />
+              </Suspense>
+            </PerformanceMonitor>
           </QualityContext.Provider>
         </Canvas>
       </div>
+
+      {/* ── Film grain — static SVG noise, premium texture at zero GPU cost ── */}
+      <div
+        className="pointer-events-none fixed inset-0 z-[35]"
+        style={{
+          opacity: 0.035,
+          mixBlendMode: "overlay",
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+          backgroundSize: "256px 256px",
+        }}
+      />
 
       {/* ── Vignette: two layers that cross-fade between ch1 and ch2+ ───── */}
       <div
@@ -343,10 +403,13 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Top-left: Publication wordmark ───────────────────────────────── */}
       <div className="absolute top-6 left-8 z-20">
-        <div className="text-[10px] font-mono font-semibold tracking-[0.35em] text-white/30 uppercase">
-          Bits'nBrews
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-[#e8a23a] rounded-[1px] shadow-[0_0_8px_rgba(232,162,58,0.6)]" />
+          <span className="text-[10px] font-mono font-semibold tracking-[0.35em] text-white/45 uppercase">
+            Bits'nBrews
+          </span>
         </div>
-        <div className="text-[11px] font-semibold tracking-[0.15em] text-white/20 uppercase mt-0.5">
+        <div className="text-[10px] font-semibold tracking-[0.18em] text-white/20 uppercase mt-1 ml-3.5">
           Architecture Explorer
         </div>
       </div>
@@ -404,12 +467,17 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           </span>
         </div>
 
-        <h1 className="text-[56px] font-bold leading-[1.02] tracking-[-0.03em] text-white/95 mb-6">
+        <h1 className="text-[60px] font-bold leading-[1.04] tracking-[-0.03em] text-white/95 mb-6">
           Where Silicon <br />
-          <span className="bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">Meets Intent.</span>
+          <span className="article-serif italic font-semibold bg-gradient-to-r from-[#f5dfae] via-[#e8a23a] to-[#9c6b22] bg-clip-text text-transparent">
+            Meets Intent.
+          </span>
         </h1>
-        <div className="w-16 h-px bg-[#e8a23a]/40 mb-8" />
-        <p className="text-[14px] leading-[1.75] text-white/50 max-w-[440px] mb-8 font-light">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-16 h-px bg-[#e8a23a]/50" />
+          <div className="w-1 h-1 rotate-45 bg-[#e8a23a]/70" />
+        </div>
+        <p className="text-[14.5px] leading-[1.8] text-white/55 max-w-[460px] mb-9 font-light">
           Bits&apos;nBrews bridges the gap between dense academic papers
           and practical computer architecture &mdash; delivered through a bespoke,
           high-performance physical and spatial engineering simulation.
@@ -420,28 +488,28 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             setChapterVisible(false);
             setTimeout(() => setChapterVisible(true), 320);
           }}
-          className="self-start flex items-center gap-3 text-[10px] font-mono font-bold tracking-[0.25em] uppercase text-[#e8a23a]/90 hover:text-white transition-colors duration-200 group border border-[#e8a23a]/30 hover:border-white px-5 py-2.5 rounded-sm bg-black/25 backdrop-blur-sm"
+          className="self-start flex items-center gap-3 text-[10px] font-mono font-bold tracking-[0.25em] uppercase text-[#e8a23a] hover:text-black hover:bg-[#e8a23a] transition-all duration-300 group border border-[#e8a23a]/40 hover:border-[#e8a23a] px-6 py-3 rounded-sm bg-black/25 hover:shadow-[0_0_24px_rgba(232,162,58,0.35)]"
         >
           <span>Explore the Architecture</span>
           <span className="inline-block transition-transform duration-200 group-hover:translate-x-1">&rarr;</span>
         </button>
       </div>
 
-      {/* ── Chapters 2–10: Compact bottom-left — always mounted, fades in/out ── */}
+      {/* ── Chapters 2–3: Compact bottom-left — always mounted, fades in/out ── */}
       <div
         className="absolute bottom-16 left-8 z-20 max-w-sm"
         style={{
-          opacity: targetLevel > 1 && targetLevel <= 10 && chapterVisible ? 1 : 0,
-          transform: targetLevel > 1 && targetLevel <= 10 && chapterVisible ? "translateY(0)" : "translateY(12px)",
+          opacity: targetLevel > 1 && targetLevel <= 3 && chapterVisible ? 1 : 0,
+          transform: targetLevel > 1 && targetLevel <= 3 && chapterVisible ? "translateY(0)" : "translateY(12px)",
           transition: "opacity 500ms ease, transform 500ms ease",
-          pointerEvents: targetLevel > 1 && targetLevel <= 10 ? "auto" : "none",
+          pointerEvents: targetLevel > 1 && targetLevel <= 3 ? "auto" : "none",
         }}
       >
         <div className="text-[8px] font-mono font-bold tracking-[0.3em] text-white/40 uppercase mb-2">
           {currentChapter.tag}
         </div>
         <div className="flex items-baseline gap-3 mb-1">
-          <span className="text-[11px] font-mono text-white/20 tracking-widest">
+          <span className="text-[11px] font-mono text-[#e8a23a]/55 tracking-widest">
             {currentChapter.chapter}
           </span>
           <h1 className="text-[28px] font-bold leading-none tracking-tight text-white/90">
@@ -465,13 +533,14 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         )}
       </div>
       
-      {/* ── Right: Component detail panel (levels 4–10, or level 3 selected track/block) ── */}
+      {/* ── Right: Detail panel (level 3 selected track/block) ── */}
       {(() => {
-        const hasSelectionInCh3 = targetLevel === 3 && (selectedTrack !== null || selectedBlock !== null);
+        if (targetLevel !== 3 || (selectedTrack === null && selectedBlock === null)) return null;
+
         const activeArticle =
-          targetLevel === 3 && selectedTrack !== null
+          selectedTrack !== null
             ? getTrackArticle(selectedTrack)
-            : targetLevel === 3 && selectedBlock !== null
+            : selectedBlock !== null
             ? (() => {
                 const blockLevelMap: Record<string, number> = {
                   "cpu-big": 4,
@@ -484,9 +553,9 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                 const lvl = blockLevelMap[selectedBlock];
                 return lvl ? getArticleForLevel(lvl) : getArticleForLevel(3);
               })()
-            : getArticleForLevel(targetLevel);
+            : "";
 
-        const isVisible = ((targetLevel >= 4 && targetLevel <= 10) || hasSelectionInCh3) && chapterVisible;
+        const isVisible = chapterVisible;
 
         return (
           <div
@@ -502,35 +571,20 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           >
             <div className="flex justify-between items-center mb-2">
               <div className="text-[8px] font-mono font-bold tracking-[0.25em] text-[#e8a23a]/70 uppercase">
-                {targetLevel === 3
-                  ? selectedTrack !== null
-                    ? "Technical Track"
-                    : "Block Detail"
-                  : "Component Detail"}
+                {selectedTrack !== null ? "Technical Track" : "Block Detail"}
               </div>
-              {targetLevel === 3 && hasSelectionInCh3 && (
-                <button
-                  onClick={() => {
-                    setSelectedTrack(null);
-                    setSelectedBlock(null);
-                  }}
-                  className="text-[9px] font-mono text-white/40 hover:text-[#e8a23a] transition-colors"
-                >
-                  [CLOSE]
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setSelectedTrack(null);
+                  setSelectedBlock(null);
+                }}
+                className="text-[9px] font-mono text-white/40 hover:text-[#e8a23a] transition-colors cursor-pointer"
+              >
+                [CLOSE]
+              </button>
             </div>
             <div className="text-left text-white/80">
               {parseMarkdown(activeArticle)}
-              {targetLevel === 3 && selectedTrack !== null && (
-                <button
-                  onClick={() => setActiveArticleTrack(selectedTrack)}
-                  className="w-full mt-4 flex items-center justify-center gap-2 text-[9px] font-mono font-bold tracking-[0.2em] text-[#e8a23a] hover:text-white transition-all uppercase border border-[#e8a23a]/30 hover:border-white px-3 py-2 rounded-lg bg-black/30 cursor-pointer"
-                >
-                  <span>Read Full Track Article</span>
-                  <span>➔</span>
-                </button>
-              )}
             </div>
           </div>
         );
@@ -540,8 +594,8 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       <div
         className="absolute right-8 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3 items-center transition-all duration-500"
         style={{
-          opacity: targetLevel === 11 ? 0 : 1,
-          pointerEvents: targetLevel === 11 ? "none" : "auto",
+          opacity: targetLevel >= 4 ? 0 : 1,
+          pointerEvents: targetLevel >= 4 ? "none" : "auto",
         }}
       >
         {CHAPTERS.map((c) => (
@@ -563,14 +617,14 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             <div
               className="transition-all duration-300 rounded-full"
               style={{
-                width: targetLevel === c.level ? "6px" : "4px",
-                height: targetLevel === c.level ? "6px" : "4px",
+                width: targetLevel === c.level ? "7px" : "4px",
+                height: targetLevel === c.level ? "7px" : "4px",
                 backgroundColor:
                   targetLevel === c.level
-                    ? "rgba(255,255,255,0.9)"
-                    : "rgba(255,255,255,0.2)",
+                    ? "#e8a23a"
+                    : "rgba(255,255,255,0.22)",
                 boxShadow: targetLevel === c.level
-                  ? "0 0 6px rgba(255,255,255,0.4)"
+                  ? "0 0 8px rgba(232,162,58,0.6)"
                   : "none",
               }}
             />
@@ -630,11 +684,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         </div>
       </div>
 
-      {/* ── Level 11: Full-screen Dark Backdrop Overlay ───────────────────── */}
+      {/* ── Hub: Full-screen Dark Backdrop Overlay ───────────────────────── */}
       <div
         className="pointer-events-none absolute inset-0 z-15 bg-black transition-opacity duration-1000 ease-in-out"
         style={{
-          opacity: levelFloat >= 10.5 ? (hubAtBottom ? 0.22 : 0.82) : 0,
+          opacity: levelFloat >= 4.5 ? (hubAtBottom ? 0.22 : 0.82) : 0,
         }}
       />
 
@@ -645,9 +699,9 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         style={{
           top: "96px",
           bottom: "24px",
-          opacity: targetLevel === 11 && chapterVisible ? 1 : 0,
-          transform: targetLevel === 11 && chapterVisible ? "translateY(0)" : "translateY(16px)",
-          pointerEvents: targetLevel === 11 ? "auto" : "none",
+          opacity: targetLevel === 5 && chapterVisible ? 1 : 0,
+          transform: targetLevel === 5 && chapterVisible ? "translateY(0)" : "translateY(16px)",
+          pointerEvents: targetLevel === 5 ? "auto" : "none",
           transition: "opacity 600ms ease, transform 600ms ease",
         }}
         onScroll={(e) => {
@@ -730,13 +784,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                     <p className="text-xs leading-relaxed text-white/50 font-light mt-2.5">
                       {track.longSummary}
                     </p>
-                    <button
-                      onClick={() => setActiveArticleTrack(track.id)}
-                      className="self-start mt-4 flex items-center gap-2 text-[9px] font-mono font-bold tracking-[0.2em] text-[#e8a23a] hover:text-white transition-all uppercase border border-[#e8a23a]/30 hover:border-white px-4 py-2 rounded-lg bg-black/10 hover:bg-black/30 cursor-pointer"
-                    >
-                      <span>Browse Track</span>
-                      <span className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">➔</span>
-                    </button>
+
                   </div>
                 </div>
               );
@@ -880,15 +928,19 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       <div 
         className="absolute bottom-6 left-8 right-8 z-20 flex items-center gap-4 transition-all duration-500"
         style={{
-          opacity: targetLevel === 11 ? 0 : 1,
-          pointerEvents: targetLevel === 11 ? "none" : "auto",
+          opacity: targetLevel === 5 ? 0 : 1,
+          pointerEvents: targetLevel === 5 ? "none" : "auto",
         }}
       >
         {/* Progress bar */}
         <div className="flex-1 h-px bg-white/[0.07] relative overflow-hidden rounded-full">
           <div
-            className="absolute left-0 top-0 h-full bg-white/30 rounded-full transition-all duration-700 ease-in-out"
-            style={{ width: `${((targetLevel - 1) / (TOTAL - 1)) * 100}%` }}
+            className="absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-in-out"
+            style={{
+              width: `${((targetLevel - 1) / (TOTAL - 1)) * 100}%`,
+              background: "linear-gradient(90deg, rgba(232,162,58,0.25), rgba(232,162,58,0.85))",
+              boxShadow: "0 0 8px rgba(232,162,58,0.35)",
+            }}
           />
         </div>
         {/* Chapter counter */}
@@ -900,18 +952,44 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           ↑ ↓ scroll or arrow keys
         </div>
       </div>
-      {activeArticleTrack && (
-        <ArticlePage
-          trackId={activeArticleTrack}
-          onClose={() => setActiveArticleTrack(null)}
-        />
-      )}
+
       {showPlayground && (
         <PlaygroundOverlay
           quality={perfMode === "high" ? "desktop" : "mobile"}
           onClose={() => setShowPlayground(false)}
         />
       )}
+
+      {(() => {
+        if (!readerArticleId) return null;
+        const article = getArticle(readerArticleId);
+        if (!article) return null;
+        return <ArticleReader article={article} onClose={() => setReaderArticleId(null)} />;
+      })()}
+
+      {/* ── Boot screen — branded cover while shaders compile ─────────────── */}
+      <div
+        className="fixed inset-0 z-[80] bg-[#030407] flex flex-col items-center justify-center"
+        style={{
+          opacity: booted ? 0 : 1,
+          visibility: booted ? "hidden" : "visible",
+          pointerEvents: booted ? "none" : "auto",
+          transition: "opacity 800ms ease 100ms, visibility 0s linear 1000ms",
+        }}
+      >
+        <div className="text-[13px] font-mono font-bold tracking-[0.5em] text-white/85 uppercase mb-1">
+          Bits'nBrews
+        </div>
+        <div className="text-[8px] font-mono tracking-[0.35em] text-[#e8a23a]/80 uppercase mb-8">
+          Architecture Explorer
+        </div>
+        <div className="w-[180px] h-px bg-white/8 relative overflow-hidden rounded-full">
+          <div className="boot-bar absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-[#e8a23a] to-transparent" />
+        </div>
+        <div className="text-[7px] font-mono tracking-[0.3em] text-white/25 uppercase mt-4">
+          Compiling silicon…
+        </div>
+      </div>
     </div>
   );
 }

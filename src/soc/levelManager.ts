@@ -41,69 +41,15 @@ export const ZOOM_LEVELS: ZoomLevel[] = [
   },
   {
     id: 4,
-    name: "CPU Clusters",
-    subtitle: "Compute Core Spotlight",
-    description: "The main processing cluster. Spotlight on performance Cortex-X4 cores and Cortex-A720 efficiency cores, highlighting core layout and local cache interfaces.",
-    defaultPosition: [-4.5, 23.8, -9.05],
-    defaultTarget: [-2.0, 7.3, -3.55],
-    fov: 22,
+    name: "The Library",
+    subtitle: "Knowledge Map",
+    description: "The die as a table of contents. Every block rises, and each main block carries one editorial track. Click a block to read.",
+    defaultPosition: [2, 19, 28],
+    defaultTarget: [0, 3.4, 0],
+    fov: 32,
   },
   {
     id: 5,
-    name: "Graphics Engine",
-    subtitle: "GPU Spotlight",
-    description: "Focusing on the 16-Core parallel mobile GPU. Spotlighting parallel execution units and high-speed local graphics caches.",
-    defaultPosition: [5.44, 23.0, -6.83],
-    defaultTarget: [2.94, 6.5, -1.33],
-    fov: 22,
-  },
-  {
-    id: 6,
-    name: "Neural Accelerator",
-    subtitle: "NPU Spotlight",
-    description: "Zooming onto the Systolic Array NPU AI Engine, showing dedicated compute clusters and weight SRAM memory storage.",
-    defaultPosition: [-8.90, 22.6, -8.91],
-    defaultTarget: [-6.40, 6.1, -3.41],
-    fov: 22,
-  },
-  {
-    id: 7,
-    name: "Baseband Modem",
-    subtitle: "Modem Spotlight",
-    description: "Focusing on the RF-isolated 5G Modem, highlighting baseband processors and electromagnetic boundary shield traces.",
-    defaultPosition: [-8.90, 21.6, 4.97],
-    defaultTarget: [-6.40, 5.1, -0.53],
-    fov: 22,
-  },
-  {
-    id: 8,
-    name: "Media Pipeline",
-    subtitle: "Media Spotlight",
-    description: "Focusing on the ISP, Video Codecs, and Audio DSP blocks, highlighting raw camera pipelines and media decoding engines.",
-    defaultPosition: [11.02, 20.8, -9.37],
-    defaultTarget: [8.52, 4.3, -3.87],
-    fov: 22,
-  },
-  {
-    id: 9,
-    name: "Memory Subsystem",
-    subtitle: "SLC & Fabric Spotlight",
-    description: "Focusing on System Cache, Memory Controller, and LPDDR memory interfaces, highlighting shared on-die data paths.",
-    defaultPosition: [1.96, 19.6, 9.29],
-    defaultTarget: [0.46, 3.1, 3.79],
-    fov: 22,
-  },
-  {
-    id: 10,
-    name: "Execution Pipeline",
-    subtitle: "Instruction Stage Flow",
-    description: "Visualizing the pipeline instruction execution stage simulation inside the primary compute core.",
-    defaultPosition: [-4.5, 20.81, -9.05],
-    defaultTarget: [-2.0, 4.31, -3.55],
-    fov: 22,
-  },
-  {
-    id: 11,
     name: "The Hub",
     subtitle: "Complete Index Directory",
     description: "",
@@ -122,52 +68,13 @@ export function getCameraParamsForLevel(
   const target = new THREE.Vector3(...current.defaultTarget);
   let fov = current.fov;
 
-  if (selectedBlockCoords && level >= 4) {
-    const { cx, cz, h } = selectedBlockCoords;
-    
-    // High-angle cinematic page-view offsets (around 70 degrees looking down)
-    const offsets: Record<number, [number, number, number]> = {
-      4: [-2.0, 16.0, -4.5],
-      5: [2.0, 16.0, -4.5],
-      6: [-2.0, 16.0, -4.5],
-      7: [-2.0, 16.0, 4.5],
-      8: [2.0, 16.0, -4.5],
-      9: [1.0, 16.0, 4.5],
-      10: [-2.0, 16.0, -4.5],
-    };
-    const offset = offsets[level] || [-2.0, 16.0, -4.5];
-    
-    // Shift target away from the camera to push the block down on the screen
-    const shiftX = offset[0] > 0 ? -0.5 : 0.5;
-    const shiftZ = offset[2] > 0 ? -1.0 : 1.0;
-    target.set(cx + shiftX, h - 0.5, cz + shiftZ);
-    
-    position.set(cx + offset[0], h + offset[1], cz + offset[2]);
-    fov = 22;
-  }
+
 
   return { position, target, fov };
 }
 
-export function getFocusedBlockCoordsForLevel(level: number): { cx: number; cz: number; h: number } | null {
-  const PRIMARY_BLOCK_FOR_LEVEL: Record<number, string> = {
-    4: "cpu-big",
-    5: "gpu",
-    6: "npu",
-    7: "modem",
-    8: "isp",
-    9: "slc",
-    10: "cpu-big",
-  };
-  const primaryId = PRIMARY_BLOCK_FOR_LEVEL[level];
-  if (!primaryId) return null;
-  const block = BLOCKS.find((b) => b.id === primaryId);
-  if (!block) return null;
-  
-  // Return coords using the block's narrative lift height scaled by 0.4
-  const LIFT_SCALE = 0.4;
-  const liftHeight = level === 10 ? 0.35 * block.lift * LIFT_SCALE : block.lift * LIFT_SCALE;
-  return { cx: block.cx, cz: block.cz, h: liftHeight + block.h };
+export function getFocusedBlockCoordsForLevel(_level: number): { cx: number; cz: number; h: number } | null {
+  return null;
 }
 
 function interpolateSpherical(v1: THREE.Vector3, v2: THREE.Vector3, alpha: number): THREE.Vector3 {

@@ -19,6 +19,18 @@ const SHARED_WELL_MAT = new THREE.MeshStandardMaterial({
 
 const SHARED_WELL_GEO = new THREE.BoxGeometry(1, 1, 1);
 
+// Cache well materials by color so repeated pads share one material instance
+// (avoids allocating a fresh MeshStandardMaterial per pad per render).
+const WELL_MAT_CACHE = new Map<string, THREE.MeshStandardMaterial>();
+function getWellMat(color: string): THREE.MeshStandardMaterial {
+  let mat = WELL_MAT_CACHE.get(color);
+  if (!mat) {
+    mat = new THREE.MeshStandardMaterial({ ...metal(color, 0.2, 1.0) });
+    WELL_MAT_CACHE.set(color, mat);
+  }
+  return mat;
+}
+
 function SectionPad({
   x,
   z,
@@ -60,7 +72,7 @@ function SectionPad({
         position={[0, h / 2 - 0.005, 0]}
         scale={[w * 0.82, wellThick, d * 0.82]}
         geometry={SHARED_WELL_GEO}
-        material={isMobile ? SHARED_WELL_MAT : new THREE.MeshStandardMaterial({...metal(inner, 0.2, 1.0)})}
+        material={isMobile ? SHARED_WELL_MAT : getWellMat(inner)}
       />
     </group>
   );

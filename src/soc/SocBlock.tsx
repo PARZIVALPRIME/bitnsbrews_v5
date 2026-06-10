@@ -5,10 +5,15 @@ import { Edges, Html, Line } from "@react-three/drei";
 import type { Block } from "./data";
 import { useQuality } from "./quality";
 import { ThermalShader } from "./shaders";
+import { BlockDetail } from "./PlaygroundDetails";
+import { getTrackForBlock } from "../articles";
 
 const AMBER = "#e8a23a";
 const AMBER_C = new THREE.Color(AMBER);
 const GAP = 0.08;
+
+// Pre-built cheap edge geometry for potato mode: 12 lines, one draw call.
+const MOBILE_EDGE_GEO = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
 
 export function SocBlock({
   block,
@@ -22,6 +27,8 @@ export function SocBlock({
   opacity = 1,
   focused: _focused = false,
   level = 3,
+  galleryPulse = false,
+  liftScale = 1.0,
 }: {
   block: Block;
   t: number;
@@ -34,6 +41,8 @@ export function SocBlock({
   opacity?: number;
   focused?: boolean;
   level?: number;
+  galleryPulse?: boolean;
+  liftScale?: number;
 }) {
   const quality = useQuality();
   const isMobile = quality === "mobile";
@@ -45,7 +54,6 @@ export function SocBlock({
   const bodyMat = useRef<THREE.MeshStandardMaterial>(null!);
   const capMat = useRef<THREE.MeshStandardMaterial>(null!);
   const outlineMat = useRef<THREE.LineBasicMaterial>(null!);
-  const plinthMat = useRef<THREE.LineBasicMaterial>(null!);
   const thermalMat = useRef<THREE.ShaderMaterial>(null!);
 
   const cur = useRef(0);
@@ -57,32 +65,6 @@ export function SocBlock({
 
   const edgeStrip = block.detail === "lpddr" || block.detail === "ioring";
   const w = Math.max(0.1, block.w - (edgeStrip ? 0 : GAP));
-  
-  // Pseudo-random deterministic factors for rotational wobble based on block ID
-  const hashX = useMemo(() => {
-    let h = 0;
-    for (let i = 0; i < block.id.length; i++) {
-      h = (h << 5) - h + block.id.charCodeAt(i);
-    }
-    return (h % 10) / 10 >= 0.5 ? 1 : -1;
-  }, [block.id]);
-
-  const hashZ = useMemo(() => {
-    let h = 0;
-    for (let i = 0; i < block.id.length; i++) {
-      h = (h << 3) - h + block.id.charCodeAt(i);
-    }
-    return (h % 10) / 10 >= 0.5 ? 1 : -1;
-  }, [block.id]);
-
-  const hashRotY = useMemo(() => {
-    let h = 0;
-    for (let i = 0; i < block.id.length; i++) {
-      h = (h << 7) - h + block.id.charCodeAt(i);
-    }
-    return ((h % 10) / 10 - 0.5) * 0.15; // subtle yaw spin
-  }, [block.id]);
-
   const d = Math.max(0.1, block.d - (edgeStrip ? 0 : GAP));
   const h = block.h;
   const cx = block.cx;
@@ -109,7 +91,15 @@ export function SocBlock({
     hoverCur.current += ((hovered && !dimmed ? 1 : 0) - hoverCur.current) * 0.15;
     selectCur.current += ((selected ? 1 : 0) - selectCur.current) * 0.14;
 
-    const y = cur.current * liftMax * (level <= 3 ? 1.0 : 0.4);
+    // Snap to targets once close enough. Without this the asymptotic lerp never
+    // reaches t exactly, the settled early-return below never fires, and every
+    // block keeps dirtying its matrix + materials every frame forever.
+    if (Math.abs(t - cur.current) < 0.001) cur.current = t;
+    if (Math.abs(modeUtilization - utilCur.current) < 0.001) utilCur.current = modeUtilization;
+    if (Math.abs((selected ? 1 : 0) - selectCur.current) < 0.001) selectCur.current = selected ? 1 : 0;
+    if (Math.abs((hovered ? 1 : 0) - hoverCur.current) < 0.001) hoverCur.current = hovered ? 1 : 0;
+
+    const y = cur.current * liftMax * liftScale;
     const microLift = utilCur.current * 0.25;
     const hoverLift = hoverCur.current * 0.5;
     const selectLift = selectCur.current * 0.3;
@@ -128,19 +118,27 @@ export function SocBlock({
         thermalMat.current.uniforms.uTime.value = state.clock.getElapsedTime();
         thermalMat.current.uniforms.uUtilization.value = utilCur.current;
       }
+      // Gallery knowledge-map mode: keep a slow emissive breathing pulse alive
+      // (material-only write, geometry stays settled).
+      if (galleryPulse && doMatUpdate && bodyMat.current) {
+        const time = state.clock.getElapsedTime();
+        const pulse = (Math.sin(time * 1.6 + cx * 0.7 + cz * 0.5) * 0.5 + 0.5) * 0.22;
+        const dimF = dimmed ? 0.06 : 1;
+        bodyMat.current.emissiveIntensity = (utilCur.current * 0.6 + pulse) * dimF * opacity;
+        if (capMat.current) {
+          capMat.current.emissiveIntensity = (utilCur.current * 0.36 + pulse * 0.8) * dimF * opacity;
+        }
+        if (outlineMat.current) {
+          outlineMat.current.opacity = (dimmed ? 0.04 : 0.22 + pulse * 0.8) * opacity;
+        }
+      }
       return;
     }
 
     if (liftGroup.current) {
+      // Clean vertical engineering lift — no mid-air wobble. The staggered
+      // center-out timing supplies all the choreography this needs.
       liftGroup.current.position.y = y + microLift + hoverLift + selectLift;
-      
-      // Calculate organic mid-air wobble tilt (peaks at 0.5 progress, returns to 0 at endpoints)
-      const hProgress = cur.current;
-      const rawTilt = Math.sin(hProgress * Math.PI);
-      const tiltFactor = Math.abs(rawTilt) < 0.001 ? 0 : rawTilt;
-      liftGroup.current.rotation.x = tiltFactor * 0.08 * hashX;
-      liftGroup.current.rotation.z = tiltFactor * 0.08 * hashZ;
-      liftGroup.current.rotation.y = tiltFactor * hashRotY;
     }
 
     if (rod.current) {
@@ -177,9 +175,6 @@ export function SocBlock({
       if (outlineMat.current) {
         outlineMat.current.opacity = (dimmed ? 0.04 : 0.15 + util * 0.15 + hover * 0.3 + sel * 0.5) * opacity;
       }
-      if (plinthMat.current) {
-        plinthMat.current.opacity = (dimmed ? 0.03 : 0.08 + sel * 0.25) * opacity;
-      }
     }
   });
 
@@ -192,19 +187,27 @@ export function SocBlock({
     dir[2] * labelScale,
   ];
 
+  // The Library (level 4): each main block carries one editorial track card.
+  const track = useMemo(() => getTrackForBlock(block.id), [block.id]);
+  const trackCardVisible = level === 4 && !!track && visMode !== "thermal";
+
+  // Labels: only the 9 major (track-bearing) blocks get always-on labels — DOM
+  // overlays are expensive, and 17 of them cluttered the floorplan anyway.
+  // Any block still shows its label while selected.
   const labelVisible = level <= 3 && (isMobile
     ? selected
-    : (_showLabels && block.showLabel && !dimmed) || selected);
+    : (_showLabels && block.showLabel && !!track && !dimmed) || selected);
 
   return (
     <group position={[cx, 0, cz]}>
-      {/* footprint ghost on die */}
-      {!isMobile && (
+      {/* footprint ghost on die — only mounted while the block is lifted, so it
+          costs nothing in the assembled state */}
+      {!isMobile && t > 0.02 && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[w, d]} />
-          <meshBasicMaterial color="#040608" transparent opacity={cur.current > 0.03 ? 0.5 : 0} />
+          <meshBasicMaterial color="#040608" transparent opacity={0.5} />
           <Edges threshold={15}>
-            <lineBasicMaterial color={AMBER} transparent opacity={cur.current > 0.03 ? 0.25 : 0} />
+            <lineBasicMaterial color={AMBER} transparent opacity={0.25} />
           </Edges>
         </mesh>
       )}
@@ -217,14 +220,6 @@ export function SocBlock({
 
       {/* lifting body group */}
       <group ref={liftGroup}>
-        {/* dark plinth base */}
-        <mesh position={[0, 0.03, 0]} castShadow={!isMobile}>
-          <boxGeometry args={[w + 0.02, 0.06, d + 0.02]} />
-          <meshStandardMaterial color="#030508" metalness={0.95} roughness={0.6} transparent opacity={dimmed ? 0.12 : 1} />
-          <Edges threshold={isMobile ? 30 : 15} scale={1.001}>
-            <lineBasicMaterial ref={plinthMat} color={AMBER} transparent opacity={0.08} />
-          </Edges>
-        </mesh>
 
         {/* main body */}
         <mesh
@@ -253,14 +248,24 @@ export function SocBlock({
               opacity={(dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1) * opacity}
             />
           )}
-          <Edges threshold={25} scale={1.002}>
-            <lineBasicMaterial ref={outlineMat} color={AMBER} transparent opacity={selected ? 0.8 : 0.25} />
-          </Edges>
+          {!isMobile && (
+            <Edges threshold={25} scale={1.002}>
+              <lineBasicMaterial ref={outlineMat} color={AMBER} transparent opacity={selected ? 0.8 : 0.25} />
+            </Edges>
+          )}
         </mesh>
 
-        {/* top cap */}
+        {/* potato-mode cheap edge outline: 12 lines, 1 draw call */}
+        {isMobile && (
+          <lineSegments position={[0, h / 2, 0]} scale={[w, h, d]}>
+            <primitive object={MOBILE_EDGE_GEO} attach="geometry" />
+            <lineBasicMaterial ref={outlineMat} color={AMBER} transparent opacity={selected ? 0.65 : 0.3} />
+          </lineSegments>
+        )}
+
+        {/* top cap — no shadow casting: it sits flush on the body */}
         {visMode !== "thermal" && (
-          <mesh position={[0, h + 0.025, 0]} castShadow={!isMobile}>
+          <mesh position={[0, h + 0.025, 0]}>
             <boxGeometry args={[Math.max(0.12, w - 0.08), 0.05, Math.max(0.12, d - 0.08)]} />
             <meshStandardMaterial
               ref={capMat}
@@ -270,13 +275,13 @@ export function SocBlock({
               transparent={visMode === "logical" || dimmed}
               opacity={(dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1) * opacity}
             />
-            {!isMobile && (
-              <Edges threshold={15} scale={1.001}>
-                <lineBasicMaterial color={AMBER} transparent opacity={dimmed ? 0.04 : 0.22} />
-              </Edges>
-            )}
           </mesh>
         )}
+
+        {/* micro-architecture surface detail (SRAM arrays, shader grids, bump fields).
+            PlaygroundDetails degrades itself on mobile (skips edges + wells), so it
+            stays on in potato mode — the silhouette is what sells the silicon. */}
+        {!dimmed && visMode !== "thermal" && <BlockDetail block={block} />}
 
         {/* architecture label */}
         {visMode !== "thermal" && labelVisible && (
@@ -306,8 +311,7 @@ export function SocBlock({
                 <div
                   className="rounded-md px-1.5 py-0.5"
                   style={{
-                    background: "rgba(6,8,12,0.9)",
-                    backdropFilter: isMobile ? "none" : "blur(6px)",
+                    background: "rgba(6,8,12,0.92)",
                     border: `0.5px solid rgba(232,162,58,${selected ? 0.55 : 0.15})`,
                     boxShadow: selected
                       ? "0 0 10px rgba(232,162,58,0.18), 0 1px 3px rgba(0,0,0,0.55)"
@@ -340,6 +344,87 @@ export function SocBlock({
                   </div>
                 </div>
               </div>
+            </Html>
+          </>
+        )}
+
+        {/* The Library — floating editorial track card above the lifted block */}
+        {trackCardVisible && track && (
+          <>
+            <Line
+              points={[[0, h + 0.1, 0], [0, h + 1.35, 0]]}
+              color={AMBER}
+              lineWidth={1}
+              transparent
+              opacity={(dimmed ? 0.12 : track.status === "published" ? 0.85 : 0.4) * opacity}
+            />
+            <mesh position={[0, h + 0.1, 0]}>
+              <sphereGeometry args={[0.07, 10, 10]} />
+              <meshBasicMaterial color={AMBER} transparent opacity={(dimmed ? 0.2 : 0.95) * opacity} />
+            </mesh>
+            <Html
+              position={[0, h + 1.55, 0]}
+              center
+              distanceFactor={29}
+              zIndexRange={[90, 0]}
+              occlude={false}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(block.id);
+                }}
+                onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+                onPointerOut={() => { document.body.style.cursor = "auto"; }}
+                className="track-card select-none cursor-pointer text-left"
+                style={{
+                  opacity: (dimmed ? 0.2 : 1) * opacity,
+                  transition: "opacity 300ms ease, transform 200ms ease",
+                }}
+              >
+                <div
+                  className="rounded-lg px-3 py-2 transition-transform duration-200 hover:scale-[1.06]"
+                  style={{
+                    background: track.status === "published"
+                      ? "linear-gradient(135deg, rgba(232,162,58,0.18), rgba(5,7,11,0.95))"
+                      : "rgba(5,7,11,0.93)",
+                    border: `1px solid rgba(232,162,58,${track.status === "published" ? 0.65 : 0.25})`,
+                    boxShadow: track.status === "published"
+                      ? "0 0 18px rgba(232,162,58,0.28), 0 2px 8px rgba(0,0,0,0.6)"
+                      : "0 2px 6px rgba(0,0,0,0.5)",
+                  }}
+                >
+                  <div className="flex items-baseline gap-2 whitespace-nowrap">
+                    <span
+                      className="font-mono font-bold leading-none"
+                      style={{ color: track.status === "published" ? "#e8a23a" : "#7a7260", fontSize: "11px" }}
+                    >
+                      {track.trackNo}
+                    </span>
+                    <span
+                      className="font-bold tracking-[0.1em] uppercase leading-none"
+                      style={{ color: track.status === "published" ? "#ffe9bd" : "#e3dac6", fontSize: "9.5px" }}
+                    >
+                      {track.trackName}
+                    </span>
+                  </div>
+                  <div
+                    className="mt-1 font-light leading-snug whitespace-nowrap"
+                    style={{ color: "#a89f8c", fontSize: "6.5px" }}
+                  >
+                    {track.hook}
+                  </div>
+                  <div
+                    className="mt-1 font-mono font-bold tracking-[0.2em] uppercase leading-none whitespace-nowrap"
+                    style={{
+                      color: track.status === "published" ? "#e8a23a" : "#6b6450",
+                      fontSize: "5.5px",
+                    }}
+                  >
+                    {track.status === "published" ? "● 1 article — click to read" : "○ in fabrication"}
+                  </div>
+                </div>
+              </button>
             </Html>
           </>
         )}

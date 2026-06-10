@@ -1,0 +1,317 @@
+// Bits'nBrews — Article library data.
+// Maps the 7 main functional die blocks to their content concepts, and holds
+// the full structured text of published articles for the ArticleReader.
+
+export type ArticleSegment =
+  | { kind: "p"; text: string }
+  | { kind: "h2"; text: string }
+  | { kind: "defs"; items: { term: string; def: string }[] }
+  | { kind: "code"; lines: string[]; caption?: string }
+  | { kind: "list"; items: string[] }
+  | { kind: "challenge"; n: number; body: string[] };
+
+export interface Article {
+  id: string;
+  track: string;
+  trackNo: string;
+  title: string;
+  subtitle: string;
+  author: string;
+  date: string;
+  readTime: string;
+  segments: ArticleSegment[];
+}
+
+export interface BlockTrack {
+  blockId: string;
+  trackNo: string;
+  trackName: string;
+  hook: string;
+  status: "published" | "coming-soon";
+  articleId?: string;
+}
+
+// ── The die-as-table-of-contents: the 9 content tracks mapped onto silicon ──
+// Each main functional block carries one editorial track. Clicking the block
+// (or its floating card) on the Library page opens that track's content.
+export const BLOCK_TRACKS: BlockTrack[] = [
+  {
+    blockId: "memctrl",
+    trackNo: "01",
+    trackName: "Silicon Explained",
+    hook: "Textbook concepts, plus the layer the textbook omits.",
+    status: "published",
+    articleId: "miss-rate",
+  },
+  {
+    blockId: "gpu",
+    trackNo: "02",
+    trackName: "Die Chronicles",
+    hook: "What the floorplan tells you about the design philosophy.",
+    status: "coming-soon",
+  },
+  {
+    blockId: "modem",
+    trackNo: "03",
+    trackName: "Chip Lore",
+    hook: "Company stories with a technical spine.",
+    status: "coming-soon",
+  },
+  {
+    blockId: "cpu-big",
+    trackNo: "04",
+    trackName: "Code → Core",
+    hook: "What your DSA solution actually does to the silicon.",
+    status: "coming-soon",
+  },
+  {
+    blockId: "npu",
+    trackNo: "05",
+    trackName: "Paper Lab",
+    hook: "Honest breakdowns of the architecture literature.",
+    status: "coming-soon",
+  },
+  {
+    blockId: "cpu-eff",
+    trackNo: "06",
+    trackName: "The Tradeoff",
+    hook: "Who each side favors — and when the loser wins.",
+    status: "coming-soon",
+  },
+  {
+    blockId: "isp",
+    trackNo: "07",
+    trackName: "Post Mortem",
+    hook: "Architecture's most instructive failures.",
+    status: "coming-soon",
+  },
+  {
+    blockId: "dsp",
+    trackNo: "08",
+    trackName: "RTL to Silicon",
+    hook: "The full design stack, from real tool runs.",
+    status: "coming-soon",
+  },
+  {
+    blockId: "slc",
+    trackNo: "09",
+    trackName: "The Hard Question",
+    hook: "Interview questions used as a lens, not as prep.",
+    status: "coming-soon",
+  },
+];
+
+export const ARTICLE_BLOCK_IDS = new Set(BLOCK_TRACKS.map((e) => e.blockId));
+
+export function getTrackForBlock(blockId: string): BlockTrack | undefined {
+  return BLOCK_TRACKS.find((e) => e.blockId === blockId);
+}
+
+// ── Published articles ──────────────────────────────────────────────────────
+export const ARTICLES: Article[] = [
+  {
+    id: "miss-rate",
+    track: "Silicon Explained",
+    trackNo: "01",
+    title: "Global Miss Rate vs Local Miss Rate",
+    subtitle: "Why Your Cache's Local Miss Rate is a Lie",
+    author: "Preetam",
+    date: "May 23, 2026",
+    readTime: "9 min read",
+    segments: [
+      {
+        kind: "p",
+        text: "If you spend enough time reading CPU architecture manuals or running gem5 simulations, you'll eventually stumble across a metric that makes absolutely no sense: the L2 cache miss rate.",
+      },
+      {
+        kind: "p",
+        text: "Look at a state-of-the-art processor like an Intel Golden Cove or an AMD Zen 4 core, and you'll see the L1 cache sitting pretty with a miss rate around 5%. But go one level deeper and the L2 is casually reporting 20%, 30%, or worse.",
+      },
+      {
+        kind: "p",
+        text: "If you're new to reading these numbers, you might conclude the L2 design team was asleep at the wheel. How could a massive 1 MB SRAM array perform so much worse than the smaller L1?",
+      },
+      {
+        kind: "p",
+        text: "We have to understand how hardware architects actually evaluate performance, and why splitting cache metrics into Global and Local views is the only way to fairly attribute performance to a specific level of the hierarchy and know exactly which design decision to pull on when a chip underperforms.",
+      },
+      { kind: "h2", text: "Textbook Definitions" },
+      {
+        kind: "p",
+        text: "Before we build the intuition, here are the two formal definitions you'll see in Patterson & Hennessy:",
+      },
+      {
+        kind: "defs",
+        items: [
+          {
+            term: "Local Miss Rate",
+            def: "Misses in a specific cache divided by accesses that actually reached that cache.",
+          },
+          {
+            term: "Global Miss Rate",
+            def: "Misses in a specific cache divided by all memory requests generated by the CPU core.",
+          },
+        ],
+      },
+      {
+        kind: "p",
+        text: "Both tell you the truth. Just different truths about different things.",
+      },
+      {
+        kind: "challenge",
+        n: 1,
+        body: [
+          "Before we move on, think about your own software tooling. Next time you run `perf stat` or profile your C++ code to optimize memory accesses, take a hard look at the cache metrics it spits out.",
+          "When it says `LLC-load-misses` (Last Level Cache), is the tool reporting the Global Miss Rate to make your code look efficient, or the Local Miss Rate to show you how badly you are thrashing the silicon? If you don't know which one your profiler is using, how can you actually trust your own software optimizations?",
+        ],
+      },
+      { kind: "h2", text: "How This Maps to AMAT" },
+      {
+        kind: "p",
+        text: "The nested Average Memory Access Time equation can be written from either perspective, and both are mathematically equivalent.",
+      },
+      {
+        kind: "code",
+        caption: "Using local miss rates",
+        lines: ["AMAT = AT_L1 + MR_L1 × (AT_L2 + Local_MR_L2 × Miss_Penalty_L2)"],
+      },
+      {
+        kind: "code",
+        caption: "Using global miss rates",
+        lines: ["AMAT = AT_L1 + MR_L1 × AT_L2 + Global_MR_L2 × Miss_Penalty_L2"],
+      },
+      {
+        kind: "list",
+        items: [
+          "`AT_L1` — L1 access time. The mandatory cycle cost to check L1 on every request.",
+          "`AT_L2` — L2 access time. Paid only when a request reaches L2.",
+          "`MR_L1` — L1 miss rate, equivalent to the local miss rate of L1.",
+          "`Local_MR_L2` — Fraction of requests that reached L2 which also missed L2.",
+          "`Global_MR_L2` — Fraction of all CPU requests that missed both L1 and L2. Equal to `MR_L1 × Local_MR_L2`.",
+          "`Miss_Penalty_L2` — Cycles lost going to the next level (L3 or DRAM).",
+        ],
+      },
+      {
+        kind: "p",
+        text: "Notice: when you use the global miss rate, you do not multiply again by the L1 miss rate, because the L1 miss probability is already baked into the global number. Two algebraically identical forms of the same equation.",
+      },
+      {
+        kind: "p",
+        text: "If the math is equivalent, why do architecture papers obsess over the distinction? Because the math is used for different purposes by different people.",
+      },
+      { kind: "h2", text: "The CPU's Cockpit: The Global View" },
+      {
+        kind: "p",
+        text: "The CPU execution engine is a hyperactive, data-starved beast. It fires off thousands of memory requests per millisecond and only cares about one thing: Did I get my data quickly, or did I have to stall my pipeline for 200 cycles waiting for DRAM?",
+      },
+      {
+        kind: "p",
+        text: "If we measure the system from this cockpit, we get the global miss rate.",
+      },
+      {
+        kind: "list",
+        items: [
+          "Concretely: the CPU issues **1,000 memory requests**.",
+          "**900** hit the L1 cache immediately.",
+          "**80** miss L1 but are found in L2.",
+          "**20** fail completely and go all the way to DRAM.",
+        ],
+      },
+      {
+        kind: "code",
+        lines: ["Global L2 Miss Rate = 20 / 1000 = 2%"],
+      },
+      {
+        kind: "p",
+        text: "Marketing teams love this number. A 2% failure rate looks incredible on a spec sheet. AMAT is low, IPC stays high, everyone is happy.",
+      },
+      {
+        kind: "p",
+        text: "But if you walk down to the engineering floor and hand that 2% to the architect who designed the L2 cache block, they will throw it back at you. That number is useless for evaluating their work, because the 2% is almost entirely driven by the L1's heroic filtering performance, not by anything the L2 team did.",
+      },
+      { kind: "h2", text: "The Golden Child: The L1 as a High-Pass Filter" },
+      {
+        kind: "p",
+        text: "To understand why the L2 looks so bad internally, you have to understand what reaches it in the first place.",
+      },
+      {
+        kind: "p",
+        text: "The L1 cache sits directly next to the execution units. It gets first pick at the buffet. When a program loops through a contiguous array, it exhibits perfect spatial locality: stride-1 access, cache line after cache line. The L1 swallows all of this effortlessly. Clean sequential strides, tight for loops, hot stack variables: fresh, structured, easy to digest. The L1 acts as a massive high-pass filter, handling 90% of all traffic.",
+      },
+      {
+        kind: "p",
+        text: "So what actually reaches the L2? **Leftovers.** Pointer chains where every next address is buried inside the current data. Randomised hash table probes scattered across gigabytes of address space. Sparse graph traversals with no spatial pattern to exploit. Cold database lookups that haven't been touched in milliseconds.",
+      },
+      {
+        kind: "p",
+        text: "The L2 isn't eating badly because it's incompetent. It's eating badly because it only ever gets the leftovers.",
+      },
+      {
+        kind: "code",
+        lines: ["Local L2 Miss Rate = 20 / 100 = 20%"],
+      },
+      {
+        kind: "p",
+        text: "Missing 20% of the time sounds terrible, until you realise the L2 is playing on hard mode.",
+      },
+      {
+        kind: "challenge",
+        n: 2,
+        body: [
+          "Assume the architect designs the L3 cache to be strictly inclusive of the L1. This means if a data block lives in L1, a copy must also exist in L3. Now, the L3 cache gets full and evicts a block. Because of the strict inclusion rule, the hardware must silently reach up and rip that exact same block out of the L1 cache too — even if the CPU was actively using it!",
+          "Think about the metrics: By changing the L3 replacement policy, you just artificially caused the L1 miss rate to spike. In an inclusive hierarchy, can you ever truly isolate a \"Local\" miss rate? Or is every cache secretly sabotaging the others?",
+        ],
+      },
+      { kind: "h2", text: "The Architect's Dilemma: Hardware Decoupling" },
+      {
+        kind: "p",
+        text: "So why not just always use the global miss rate? Because global metrics can completely mask the quality of individual cache designs.",
+      },
+      {
+        kind: "p",
+        text: "Consider: the L1 design team invents a brilliant new next-line prefetcher. The L1 miss rate drops from 10% to 5%. Because the L1 is now catching nearly everything, very few requests leak through to the L2. The global L2 miss rate drops beautifully — even though you didn't touch a single transistor inside the L2 cache.",
+      },
+      {
+        kind: "p",
+        text: "If you were only tracking global metrics, you'd pop champagne celebrating how much better your L2 got. But the L2 didn't get better. You just made its older sibling stronger.",
+      },
+      {
+        kind: "p",
+        text: "This is **hardware decoupling**: the idea that the local miss rate strips away the L1's filtering effect to expose the naked truth about the L2's own SRAM density and replacement policy quality. It lets an architect ask: *Is this specific silicon block pulling its weight, independent of everything upstream?*",
+      },
+      {
+        kind: "challenge",
+        n: 3,
+        body: [
+          "Consider Intel's Alder Lake: a P-core with a large, aggressive L1 and an E-core with a smaller, weaker L1, both sharing the same L2 cache. Run a memory-intensive, pointer-chasing workload exclusively on the E-core. The E-core's weak L1 lets through a flood of requests with relatively normal miss patterns. Now swap: move the same workload to the P-core. The P-core's stronger L1 filters aggressively, so only truly irregular traffic leaks to L2.",
+          "Question: In which scenario is the L2's local miss rate higher — P-core or E-core — and does a higher local miss rate here mean the L2 is performing worse, or just that it's receiving harder inputs?",
+        ],
+      },
+      { kind: "h2", text: "The Takeaway" },
+      {
+        kind: "p",
+        text: "Modern processors are not a single monolithic memory block. They are a cascade of specialised filters, each one handing off its failures to the next level down.",
+      },
+      {
+        kind: "list",
+        items: [
+          "**Use the global miss rate** when you want to compute AMAT and understand overall system performance.",
+          "**Use the local miss rate** when you need to know whether a specific cache level's silicon footprint is actually earning its area.",
+          "Marketing needs the global view to sell the chip. The architect needs the local view to know which engineering team needs to go back to the drawing board.",
+        ],
+      },
+      {
+        kind: "challenge",
+        n: 4,
+        body: [
+          "Suppose the L1 design team adds an aggressive hardware prefetcher that fetches the next cache line speculatively into L2 on every L1 miss. The prefetcher is only 50% accurate — half of everything it fetches into L2 is never actually used.",
+          "Question: does the L2's local miss rate go up, go down, or stay the same — and does it still tell you the truth about L2's quality?",
+        ],
+      },
+    ],
+  },
+];
+
+export function getArticle(id: string): Article | undefined {
+  return ARTICLES.find((a) => a.id === id);
+}

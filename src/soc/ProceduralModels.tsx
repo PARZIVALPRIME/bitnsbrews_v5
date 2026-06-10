@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useLayoutEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Edges } from "@react-three/drei";
 import { TransistorFlowShader } from "./shaders";
@@ -252,58 +252,78 @@ export function PackageSubstrate({ opacity = 1 }: { opacity?: number }) {
         );
       })}
 
-      {/* Realistic 3D SMD Capacitors */}
-      {capacitors.map((cap, i) => (
-        <group key={`cap-${i}`} position={[cap.x, -0.6, cap.z]} rotation={[0, cap.rot, 0]}>
-          {/* Ceramic Body - brownish-grey matte dielectric block */}
-          <mesh castShadow>
-            <boxGeometry args={[0.55, 0.22, 0.36]} />
-            <meshStandardMaterial 
-              color="#7c6f62" 
-              roughness={0.65} 
-              metalness={0.1} 
-              transparent 
-              opacity={opacity} 
-            />
-          </mesh>
-          {/* Left Solder Cap - high-gloss metallic silver */}
-          <mesh position={[-0.23, 0.002, 0]} castShadow>
-            <boxGeometry args={[0.12, 0.23, 0.38]} />
-            <meshStandardMaterial 
-              color="#c0c0c0" 
-              metalness={0.95} 
-              roughness={0.1} 
-              transparent 
-              opacity={opacity} 
-            />
-          </mesh>
-          {/* Right Solder Cap - high-gloss metallic silver */}
-          <mesh position={[0.23, 0.002, 0]} castShadow>
-            <boxGeometry args={[0.12, 0.23, 0.38]} />
-            <meshStandardMaterial 
-              color="#c0c0c0" 
-              metalness={0.95} 
-              roughness={0.1} 
-              transparent 
-              opacity={opacity} 
-            />
-          </mesh>
-        </group>
-      ))}
+      {/* Realistic 3D SMD Capacitors — instanced: 2 draw calls instead of 36 */}
+      <InstancedCapacitors capacitors={capacitors} opacity={opacity} />
 
-      {/* Golden Solder Micro-Balls grid */}
-      {ballData.map((pos, i) => (
-        <mesh key={i} position={pos}>
-          <sphereGeometry args={[0.22, 10, 10]} />
-          <meshStandardMaterial 
-            color="#d4af37" 
-            metalness={0.98} 
-            roughness={0.12} 
-            transparent 
-            opacity={opacity} 
-          />
-        </mesh>
-      ))}
+      {/* Golden Solder Micro-Balls grid — instanced: 1 draw call instead of ~200 */}
+      <InstancedSolderBalls positions={ballData} opacity={opacity} />
+    </group>
+  );
+}
+
+function InstancedSolderBalls({ positions, opacity }: { positions: THREE.Vector3[]; opacity: number }) {
+  const ref = useRef<THREE.InstancedMesh>(null!);
+
+  useLayoutEffect(() => {
+    const dummy = new THREE.Object3D();
+    positions.forEach((pos, i) => {
+      dummy.position.copy(pos);
+      dummy.updateMatrix();
+      ref.current.setMatrixAt(i, dummy.matrix);
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
+  }, [positions]);
+
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, positions.length]}>
+      <sphereGeometry args={[0.22, 10, 10]} />
+      <meshStandardMaterial color="#d4af37" metalness={0.98} roughness={0.12} transparent opacity={opacity} />
+    </instancedMesh>
+  );
+}
+
+function InstancedCapacitors({
+  capacitors,
+  opacity,
+}: {
+  capacitors: { x: number; z: number; rot: number }[];
+  opacity: number;
+}) {
+  const bodyRef = useRef<THREE.InstancedMesh>(null!);
+  const endRef = useRef<THREE.InstancedMesh>(null!);
+
+  useLayoutEffect(() => {
+    const dummy = new THREE.Object3D();
+    capacitors.forEach((cap, i) => {
+      dummy.position.set(cap.x, -0.6, cap.z);
+      dummy.rotation.set(0, cap.rot, 0);
+      dummy.updateMatrix();
+      bodyRef.current.setMatrixAt(i, dummy.matrix);
+
+      // Two solder terminals at local x = ±0.23, rotated into place
+      [-0.23, 0.23].forEach((off, j) => {
+        const c = Math.cos(cap.rot);
+        const s = Math.sin(cap.rot);
+        dummy.position.set(cap.x + off * c, -0.598, cap.z - off * s);
+        dummy.rotation.set(0, cap.rot, 0);
+        dummy.updateMatrix();
+        endRef.current.setMatrixAt(i * 2 + j, dummy.matrix);
+      });
+    });
+    bodyRef.current.instanceMatrix.needsUpdate = true;
+    endRef.current.instanceMatrix.needsUpdate = true;
+  }, [capacitors]);
+
+  return (
+    <group>
+      <instancedMesh ref={bodyRef} args={[undefined, undefined, capacitors.length]}>
+        <boxGeometry args={[0.55, 0.22, 0.36]} />
+        <meshStandardMaterial color="#7c6f62" roughness={0.65} metalness={0.1} transparent opacity={opacity} />
+      </instancedMesh>
+      <instancedMesh ref={endRef} args={[undefined, undefined, capacitors.length * 2]}>
+        <boxGeometry args={[0.12, 0.23, 0.38]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.95} roughness={0.1} transparent opacity={opacity} />
+      </instancedMesh>
     </group>
   );
 }
