@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { useMemo, useRef, useEffect, memo } from "react";
+import { useMemo, useRef, useEffect, useState, memo } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Lightformer, Edges, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing";
@@ -563,7 +563,7 @@ interface SceneProps {
   selected: string | null;
   setSelected: (id: string | null) => void;
   mode: SocMode;
-  levelFloat?: number;
+  targetLevel: number;
   visMode?: string;
 }
 
@@ -588,9 +588,24 @@ export function Scene({
   selected,
   setSelected,
   mode,
-  levelFloat = 4.0,
+  targetLevel,
   visMode = "physical",
 }: SceneProps) {
+  const [levelFloat, setLevelFloat] = useState(targetLevel);
+
+  useEffect(() => {
+    let raf: number;
+    const ease = () => {
+      setLevelFloat((prev) => {
+        const diff = targetLevel - prev;
+        if (Math.abs(diff) < 0.02) return targetLevel; // snap & settle
+        return Math.round((prev + diff * 0.12) * 50) / 50;
+      });
+      raf = requestAnimationFrame(ease);
+    };
+    raf = requestAnimationFrame(ease);
+    return () => cancelAnimationFrame(raf);
+  }, [targetLevel]);
   const quality = useQuality();
   const isMobile = quality === "mobile";
   
@@ -712,15 +727,16 @@ export function Scene({
         maxDistance={80}
       />
 
-      {!isMobile ? (
-        // multisampling=0 + SMAA: same edge quality as MSAA through the composer
-        // at a fraction of the fill-rate cost.
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.55} luminanceThreshold={0.5} luminanceSmoothing={0.15} mipmapBlur />
-          <Vignette eskil={false} offset={0.18} darkness={0.65} />
-          <SMAA />
-        </EffectComposer>
-      ) : null}
+      <EffectComposer multisampling={0}>
+        <Bloom
+          intensity={isMobile ? 0.35 : 0.55}
+          luminanceThreshold={0.5}
+          luminanceSmoothing={0.15}
+          mipmapBlur={!isMobile}
+        />
+        <Vignette eskil={false} offset={0.18} darkness={0.65} />
+        {!isMobile && <SMAA />}
+      </EffectComposer>
     </>
   );
 }

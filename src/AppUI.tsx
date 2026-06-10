@@ -7,6 +7,7 @@ import { getArticleForLevel, parseMarkdown } from "./chapterArticles";
 import { TRACKS, getTrackArticle } from "./trackArticles";
 import { getTrackForBlock, getArticle } from "./articles";
 import { ArticleReader } from "./ArticleReader";
+import { ComponentPortal } from "./ComponentPortal";
 
 import { PlaygroundOverlay } from "./soc/PlaygroundOverlay";
 
@@ -26,6 +27,19 @@ interface UiProps {
 }
 
 function CircuitBackground({ active }: { active: boolean }) {
+  const [shouldRender, setShouldRender] = useState(active);
+
+  useEffect(() => {
+    if (active) {
+      setShouldRender(true);
+    } else {
+      const timer = setTimeout(() => setShouldRender(false), 1050);
+      return () => clearTimeout(timer);
+    }
+  }, [active]);
+
+  if (!shouldRender) return null;
+
   return (
     <div
       className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ease-in-out"
@@ -106,7 +120,6 @@ function CircuitBackground({ active }: { active: boolean }) {
 export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop" }: UiProps) {
   // ── State ─────────────────────────────────────────────────────────────────
   const [targetLevel, setTargetLevel] = useState(1);       // snap destination (1-7)
-  const [levelFloat, setLevelFloat] = useState(1.0);        // smooth float fed to camera
   const [chapterVisible, setChapterVisible] = useState(true); // text fade state
   const [t, setT] = useState(0.0);
   const [visMode] = useState("physical");
@@ -119,10 +132,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
   // ── Article gallery (Page 4) state ────────────────────────────────────────
   const [readerArticleId, setReaderArticleId] = useState<string | null>(null);
+  const [activeComponentPortal, setActiveComponentPortal] = useState<string | null>(null);
   const readerOpenRef = useRef(false);
   useEffect(() => {
-    readerOpenRef.current = readerArticleId !== null;
-  }, [readerArticleId]);
+    readerOpenRef.current = readerArticleId !== null || activeComponentPortal !== null;
+  }, [readerArticleId, activeComponentPortal]);
 
   const [showPlayground, setShowPlayground] = useState(false);
 
@@ -298,37 +312,18 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     };
   }, []);
 
-  // ── Smooth lerp: levelFloat → targetLevel (drives camera interpolation) ───
-  // Values are quantized to 0.02 steps: React then bails out of identical-state
-  // updates, so the heavy scene tree stops re-rendering the moment the value
-  // settles. The in-canvas camera/block lerps smooth over the steps.
-  useEffect(() => {
-    let raf: number;
-    const ease = () => {
-      setLevelFloat((prev) => {
-        const diff = targetLevel - prev;
-        if (Math.abs(diff) < 0.02) return targetLevel; // snap & settle
-        return Math.round((prev + diff * 0.12) * 50) / 50;
-      });
-      raf = requestAnimationFrame(ease);
-    };
-    raf = requestAnimationFrame(ease);
-    return () => cancelAnimationFrame(raf);
-  }, [targetLevel]);
+  // ── Chapter transition handlers ───
 
   const currentChapter = CHAPTERS.find((c) => c.level === targetLevel) ?? CHAPTERS[CHAPTERS.length - 1];
   const SceneEl = SceneComp;
 
   // On the Library page the die is the table of contents: clicking a block
-  // (or its floating track card) opens that track's article if published.
+  // (or its floating track card) opens that track's article portal.
   // Stable identity (useCallback) keeps memoized scene blocks from re-rendering.
   const handleBlockSelect = useCallback((id: string | null) => {
     setSelectedBlock(id);
     if (id && targetLevelRef.current === 4) {
-      const track = getTrackForBlock(id);
-      if (track?.status === "published" && track.articleId) {
-        setReaderArticleId(track.articleId);
-      }
+      setActiveComponentPortal(id);
     }
   }, []);
 
@@ -362,7 +357,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                   selected={selectedBlock}
                   setSelected={handleBlockSelect}
                   mode="Idle"
-                  levelFloat={levelFloat}
+                  targetLevel={targetLevel}
                   visMode={visMode}
                 />
               </Suspense>
@@ -688,7 +683,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       <div
         className="pointer-events-none absolute inset-0 z-15 bg-black transition-opacity duration-1000 ease-in-out"
         style={{
-          opacity: levelFloat >= 4.5 ? (hubAtBottom ? 0.22 : 0.82) : 0,
+          opacity: targetLevel === 5 ? (hubAtBottom ? 0.22 : 0.82) : 0,
         }}
       />
 
@@ -957,6 +952,19 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         <PlaygroundOverlay
           quality={perfMode === "high" ? "desktop" : "mobile"}
           onClose={() => setShowPlayground(false)}
+        />
+      )}
+
+      {activeComponentPortal && (
+        <ComponentPortal
+          componentId={activeComponentPortal}
+          onClose={() => {
+            setActiveComponentPortal(null);
+            setSelectedBlock(null);
+          }}
+          onReadArticle={(articleId) => {
+            setReaderArticleId(articleId);
+          }}
         />
       )}
 

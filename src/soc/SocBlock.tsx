@@ -189,14 +189,14 @@ export function SocBlock({
 
   // The Library (level 4): each main block carries one editorial track card.
   const track = useMemo(() => getTrackForBlock(block.id), [block.id]);
-  const trackCardVisible = level === 4 && !!track && visMode !== "thermal";
+  const trackCardVisible = false; // Disabled: we show component names only on the die
 
   // Labels: only the 9 major (track-bearing) blocks get always-on labels — DOM
   // overlays are expensive, and 17 of them cluttered the floorplan anyway.
-  // Any block still shows its label while selected.
-  const labelVisible = level <= 3 && (isMobile
+  // Any block still shows its label while selected. On Level 4, we show the component name labels.
+  const labelVisible = (level <= 4) && (isMobile
     ? selected
-    : (_showLabels && block.showLabel && !!track && !dimmed) || selected);
+    : (((level === 4 || _showLabels) && block.showLabel && !!track && !dimmed) || selected));
 
   return (
     <group position={[cx, 0, cz]}>
@@ -304,12 +304,18 @@ export function SocBlock({
               zIndexRange={[100, 0]}
               occlude={false}
             >
-              <div
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(selected ? null : block.id);
+                }}
+                onPointerOver={() => { if (!isMobile) document.body.style.cursor = "pointer"; }}
+                onPointerOut={() => { if (!isMobile) document.body.style.cursor = "auto"; }}
                 style={{ transform: "translateY(-50%)" }}
-                className="pointer-events-none select-none whitespace-nowrap"
+                className="pointer-events-auto select-none whitespace-nowrap cursor-pointer text-left block bg-transparent border-0 p-0"
               >
                 <div
-                  className="rounded-md px-1.5 py-0.5"
+                  className="rounded-md px-1.5 py-0.5 hover:border-[#e8a23a]/50 transition-colors duration-200"
                   style={{
                     background: "rgba(6,8,12,0.92)",
                     border: `0.5px solid rgba(232,162,58,${selected ? 0.55 : 0.15})`,
@@ -343,91 +349,12 @@ export function SocBlock({
                     {block.w.toFixed(1)}×{block.d.toFixed(1)}×{h.toFixed(1)}u
                   </div>
                 </div>
-              </div>
-            </Html>
-          </>
-        )}
-
-        {/* The Library — floating editorial track card above the lifted block */}
-        {trackCardVisible && track && (
-          <>
-            <Line
-              points={[[0, h + 0.1, 0], [0, h + 1.35, 0]]}
-              color={AMBER}
-              lineWidth={1}
-              transparent
-              opacity={(dimmed ? 0.12 : track.status === "published" ? 0.85 : 0.4) * opacity}
-            />
-            <mesh position={[0, h + 0.1, 0]}>
-              <sphereGeometry args={[0.07, 10, 10]} />
-              <meshBasicMaterial color={AMBER} transparent opacity={(dimmed ? 0.2 : 0.95) * opacity} />
-            </mesh>
-            <Html
-              position={[0, h + 1.55, 0]}
-              center
-              distanceFactor={29}
-              zIndexRange={[90, 0]}
-              occlude={false}
-            >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect(block.id);
-                }}
-                onPointerOver={() => { document.body.style.cursor = "pointer"; }}
-                onPointerOut={() => { document.body.style.cursor = "auto"; }}
-                className="track-card select-none cursor-pointer text-left"
-                style={{
-                  opacity: (dimmed ? 0.2 : 1) * opacity,
-                  transition: "opacity 300ms ease, transform 200ms ease",
-                }}
-              >
-                <div
-                  className="rounded-lg px-3 py-2 transition-transform duration-200 hover:scale-[1.06]"
-                  style={{
-                    background: track.status === "published"
-                      ? "linear-gradient(135deg, rgba(232,162,58,0.18), rgba(5,7,11,0.95))"
-                      : "rgba(5,7,11,0.93)",
-                    border: `1px solid rgba(232,162,58,${track.status === "published" ? 0.65 : 0.25})`,
-                    boxShadow: track.status === "published"
-                      ? "0 0 18px rgba(232,162,58,0.28), 0 2px 8px rgba(0,0,0,0.6)"
-                      : "0 2px 6px rgba(0,0,0,0.5)",
-                  }}
-                >
-                  <div className="flex items-baseline gap-2 whitespace-nowrap">
-                    <span
-                      className="font-mono font-bold leading-none"
-                      style={{ color: track.status === "published" ? "#e8a23a" : "#7a7260", fontSize: "11px" }}
-                    >
-                      {track.trackNo}
-                    </span>
-                    <span
-                      className="font-bold tracking-[0.1em] uppercase leading-none"
-                      style={{ color: track.status === "published" ? "#ffe9bd" : "#e3dac6", fontSize: "9.5px" }}
-                    >
-                      {track.trackName}
-                    </span>
-                  </div>
-                  <div
-                    className="mt-1 font-light leading-snug whitespace-nowrap"
-                    style={{ color: "#a89f8c", fontSize: "6.5px" }}
-                  >
-                    {track.hook}
-                  </div>
-                  <div
-                    className="mt-1 font-mono font-bold tracking-[0.2em] uppercase leading-none whitespace-nowrap"
-                    style={{
-                      color: track.status === "published" ? "#e8a23a" : "#6b6450",
-                      fontSize: "5.5px",
-                    }}
-                  >
-                    {track.status === "published" ? "● 1 article — click to read" : "○ in fabrication"}
-                  </div>
-                </div>
               </button>
             </Html>
           </>
         )}
+
+        {/* Track cards removed from die, component labels used instead */}
 
       </group>
     </group>
