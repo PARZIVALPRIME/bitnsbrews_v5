@@ -5,7 +5,7 @@ import { QualityContext } from "./soc/quality";
 import { CHAPTERS, TOTAL } from "./chapters";
 import { getArticleForLevel, parseMarkdown } from "./chapterArticles";
 import { TRACKS, getTrackArticle } from "./trackArticles";
-import { getTrackForBlock, getArticle } from "./articles";
+import { getArticle } from "./articles";
 import { ArticleReader } from "./ArticleReader";
 import { ComponentPortal } from "./ComponentPortal";
 
@@ -17,7 +17,7 @@ interface SceneProps {
   selected: string | null;
   setSelected: (id: string | null) => void;
   mode: "Idle";
-  levelFloat: number;
+  targetLevel: number;
   visMode: string;
 }
 
@@ -26,96 +26,8 @@ interface UiProps {
   quality?: "desktop" | "mobile";
 }
 
-function CircuitBackground({ active }: { active: boolean }) {
-  const [shouldRender, setShouldRender] = useState(active);
-
-  useEffect(() => {
-    if (active) {
-      setShouldRender(true);
-    } else {
-      const timer = setTimeout(() => setShouldRender(false), 1050);
-      return () => clearTimeout(timer);
-    }
-  }, [active]);
-
-  if (!shouldRender) return null;
-
-  return (
-    <div
-      className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ease-in-out"
-      style={{ opacity: active ? 0.45 : 0 }}
-    >
-      <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="ambientGlow" cx="20%" cy="50%" r="55%">
-            <stop offset="0%" stopColor="rgba(232, 162, 58, 0.12)" />
-            <stop offset="100%" stopColor="rgba(8, 9, 14, 0)" />
-          </radialGradient>
-          <linearGradient id="traceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(232, 162, 58, 0.3)" />
-            <stop offset="50%" stopColor="rgba(232, 162, 58, 0.8)" />
-            <stop offset="100%" stopColor="rgba(232, 162, 58, 0.1)" />
-          </linearGradient>
-        </defs>
-
-        <style>{`
-          @keyframes circuitDash {
-            to {
-              stroke-dashoffset: -160;
-            }
-          }
-          .circuit-line {
-            stroke: url(#traceGrad);
-            stroke-width: 1.5;
-            stroke-linecap: round;
-            stroke-dasharray: 12 48;
-            animation: circuitDash 10s linear infinite;
-          }
-          .circuit-node {
-            fill: #e8a23a;
-            filter: drop-shadow(0 0 4px rgba(232,162,58,0.7));
-          }
-        `}</style>
-
-        {/* Ambient warm glow behind text */}
-        <rect width="100%" height="100%" fill="url(#ambientGlow)" />
-
-        {/* Tech Grid */}
-        <pattern id="bgGrid" width="50" height="50" patternUnits="userSpaceOnUse">
-          <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(255, 255, 255, 0.015)" strokeWidth="1" />
-        </pattern>
-        <rect width="100%" height="100%" fill="url(#bgGrid)" />
-
-        <g opacity="0.55">
-          {/* Main bus lines */}
-          <path d="M -10 120 L 180 120 L 280 220 L 460 220" fill="none" className="circuit-line" />
-          <path d="M 60 170 L 200 170 L 250 220" fill="none" className="circuit-line" style={{ animationDelay: "-2.5s" }} />
-          <path d="M -20 380 L 320 380 L 420 480 L 680 480" fill="none" className="circuit-line" style={{ animationDelay: "-5s" }} />
-          
-          <path d="M 220 0 L 220 120" fill="none" stroke="rgba(232, 162, 58, 0.08)" strokeWidth="1" />
-          <path d="M 320 380 L 320 540 L 280 580" fill="none" className="circuit-line" style={{ animationDelay: "-1.2s" }} />
-          <path d="M 180 120 L 180 240 L 110 310 L 110 480" fill="none" className="circuit-line" style={{ animationDelay: "-6.2s" }} />
-
-          {/* Solder circles */}
-          <circle cx="180" cy="120" r="3.2" className="circuit-node" />
-          <circle cx="280" cy="220" r="3.2" className="circuit-node" />
-          <circle cx="320" cy="380" r="3.2" className="circuit-node" />
-          <circle cx="420" cy="480" r="3.5" className="circuit-node" />
-          <circle cx="110" cy="310" r="2.5" className="circuit-node" />
-          
-          {/* Silicon footprint pads array */}
-          <g opacity="0.25" transform="translate(195, 260)">
-            {Array.from({ length: 4 }).map((_, r) =>
-              Array.from({ length: 6 }).map((_, c) => (
-                <circle key={`${r}-${c}`} cx={c * 14} cy={r * 14} r="1" fill="#e8a23a" />
-              ))
-            )}
-          </g>
-        </g>
-      </svg>
-    </div>
-  );
-}
+// Shared label style: quiet uppercase eyebrow — used sparingly, one per section.
+const EYEBROW = "text-[10px] font-medium tracking-[0.12em] uppercase";
 
 export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop" }: UiProps) {
   // ── State ─────────────────────────────────────────────────────────────────
@@ -328,10 +240,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   }, []);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#08090e] font-sans text-white select-none">
-
-      {/* ── Landing Page Background Grid & Circuits ─────────────────────── */}
-      <CircuitBackground active={targetLevel === 1} />
+    <div className="relative h-screen w-screen overflow-hidden bg-[#0b0d12] font-sans text-white select-none">
 
       {/* ── 3D Canvas ─────────────────────────────────────────────────────── */}
       <div className="absolute inset-0 z-1">
@@ -366,23 +275,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         </Canvas>
       </div>
 
-      {/* ── Film grain — static SVG noise, premium texture at zero GPU cost ── */}
-      <div
-        className="pointer-events-none fixed inset-0 z-[35]"
-        style={{
-          opacity: 0.035,
-          mixBlendMode: "overlay",
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-          backgroundSize: "256px 256px",
-        }}
-      />
-
       {/* ── Vignette: two layers that cross-fade between ch1 and ch2+ ───── */}
       <div
         className="pointer-events-none absolute inset-0 z-10"
         style={{
-          background: "linear-gradient(to right, rgba(8,9,14,0.95) 0%, rgba(8,9,14,0.85) 30%, transparent 60%)",
+          background: "linear-gradient(to right, rgba(11,13,18,0.95) 0%, rgba(11,13,18,0.85) 30%, transparent 60%)",
           opacity: targetLevel === 1 ? 1 : 0,
           transition: "opacity 700ms ease",
         }}
@@ -390,7 +287,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       <div
         className="pointer-events-none absolute inset-0 z-10"
         style={{
-          background: "radial-gradient(ellipse at center, transparent 30%, rgba(8,9,14,0.55))",
+          background: "radial-gradient(ellipse at center, transparent 30%, rgba(11,13,18,0.5))",
           opacity: targetLevel === 1 ? 0 : 1,
           transition: "opacity 700ms ease",
         }}
@@ -398,46 +295,41 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Top-left: Publication wordmark ───────────────────────────────── */}
       <div className="absolute top-6 left-8 z-20">
-        <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-[#e8a23a] rounded-[1px] shadow-[0_0_8px_rgba(232,162,58,0.6)]" />
-          <span className="text-[10px] font-mono font-semibold tracking-[0.35em] text-white/45 uppercase">
-            Bits'nBrews
+        <div className="flex items-baseline gap-2.5">
+          <span className="text-[15px] font-semibold tracking-[-0.01em] text-white/90">
+            Bits&apos;nBrews
           </span>
-        </div>
-        <div className="text-[10px] font-semibold tracking-[0.18em] text-white/20 uppercase mt-1 ml-3.5">
-          Architecture Explorer
+          <span className="text-[11px] font-normal text-white/40">
+            Architecture Explorer
+          </span>
         </div>
       </div>
 
       {/* ── Top-right: Explode & Performance toggles ──────────────────────── */}
       <div className="absolute top-6 right-8 z-20 flex flex-col items-end gap-1.5">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => {
               const nextMode = perfMode === "high" ? "low" : "high";
               setPerfMode(nextMode);
               setAutoDowngraded(false);
             }}
-            className={`text-[9px] font-mono font-semibold tracking-[0.2em] uppercase transition-colors duration-200 border px-3 py-1.5 rounded-sm ${
-              perfMode === "high"
-                ? "border-amber-400/30 text-amber-400 hover:bg-amber-400/10 cursor-pointer"
-                : "border-red-400/30 text-red-400 hover:bg-red-400/10 cursor-pointer"
-            }`}
-            title={perfMode === "high" ? "Switch to Potato Mode (Optimized)" : "Switch to High Quality (Bloom & Antialiasing)"}
+            className="text-[11px] font-medium text-white/55 hover:text-white/90 transition-colors duration-200 border border-white/12 hover:border-white/30 px-3 py-1.5 rounded-md cursor-pointer bg-[#12151d]/80"
+            title={perfMode === "high" ? "Switch to performance mode (lighter rendering)" : "Switch to high quality (bloom & antialiasing)"}
           >
-            {perfMode === "high" ? "⚡ HIGH QUALITY" : "🥔 POTATO MODE"}
+            {perfMode === "high" ? "Quality: High" : "Quality: Performance"}
           </button>
 
           <button
             onClick={() => setT((p) => (p === 0 ? 1 : 0))}
-            className="text-[9px] font-mono font-semibold tracking-[0.2em] uppercase text-white/35 hover:text-white/70 transition-colors duration-200 border border-white/10 hover:border-white/30 px-3 py-1.5 rounded-sm cursor-pointer"
+            className="text-[11px] font-medium text-white/55 hover:text-white/90 transition-colors duration-200 border border-white/12 hover:border-white/30 px-3 py-1.5 rounded-md cursor-pointer bg-[#12151d]/80"
           >
-            {t === 0 ? "EXPLODE VIEW" : "ASSEMBLE"}
+            {t === 0 ? "Exploded view" : "Assemble"}
           </button>
         </div>
         {autoDowngraded && (
-          <span className="text-[7px] font-mono text-red-400/80 tracking-wider uppercase bg-red-400/5 border border-red-400/10 px-1.5 py-0.5 rounded-sm select-none">
-            Auto-optimized for low-end PC
+          <span className="text-[10px] text-white/40 select-none">
+            Adjusted automatically for this device
           </span>
         )}
       </div>
@@ -452,42 +344,34 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: targetLevel === 1 ? "auto" : "none",
         }}
       >
-        {/* Technical metadata badges */}
-        <div className="flex gap-4 items-center mb-6">
-          <span className="text-[8px] font-mono font-bold tracking-[0.25em] text-[#e8a23a] uppercase bg-[#e8a23a]/5 border border-[#e8a23a]/15 px-2.5 py-1 rounded-sm">
-            3nm GAA EUV PROCESS
-          </span>
-          <span className="text-[8px] font-mono font-bold tracking-[0.25em] text-white/40 uppercase">
-            EDITION 2026
-          </span>
+        {/* Edition line */}
+        <div className={`${EYEBROW} text-white/40 mb-7`}>
+          An interactive guide to the modern system-on-chip
         </div>
 
-        <h1 className="text-[60px] font-bold leading-[1.04] tracking-[-0.03em] text-white/95 mb-6">
-          Where Silicon <br />
-          <span className="article-serif italic font-semibold bg-gradient-to-r from-[#f5dfae] via-[#e8a23a] to-[#9c6b22] bg-clip-text text-transparent">
-            Meets Intent.
-          </span>
+        <h1 className="text-[58px] font-semibold leading-[1.06] tracking-[-0.03em] text-white/95 mb-7">
+          What&apos;s really inside <br />
+          <span className="article-serif italic font-medium text-white/85">your processor.</span>
         </h1>
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-16 h-px bg-[#e8a23a]/50" />
-          <div className="w-1 h-1 rotate-45 bg-[#e8a23a]/70" />
-        </div>
-        <p className="text-[14.5px] leading-[1.8] text-white/55 max-w-[460px] mb-9 font-light">
-          Bits&apos;nBrews bridges the gap between dense academic papers
-          and practical computer architecture &mdash; delivered through a bespoke,
-          high-performance physical and spatial engineering simulation.
+        <p className="text-[15px] leading-[1.8] text-white/60 max-w-[460px] mb-10">
+          Bits&apos;nBrews bridges the gap between dense academic papers and
+          practical computer architecture. Travel from the laptop in front of
+          you down to the 3-nanometre silicon it runs on &mdash; one layer at a time.
         </p>
-        <button
-          onClick={() => {
-            setTargetLevel(2);
-            setChapterVisible(false);
-            setTimeout(() => setChapterVisible(true), 320);
-          }}
-          className="self-start flex items-center gap-3 text-[10px] font-mono font-bold tracking-[0.25em] uppercase text-[#e8a23a] hover:text-black hover:bg-[#e8a23a] transition-all duration-300 group border border-[#e8a23a]/40 hover:border-[#e8a23a] px-6 py-3 rounded-sm bg-black/25 hover:shadow-[0_0_24px_rgba(232,162,58,0.35)]"
-        >
-          <span>Explore the Architecture</span>
-          <span className="inline-block transition-transform duration-200 group-hover:translate-x-1">&rarr;</span>
-        </button>
+        <div className="flex items-center gap-5">
+          <button
+            onClick={() => {
+              setTargetLevel(2);
+              setChapterVisible(false);
+              setTimeout(() => setChapterVisible(true), 320);
+            }}
+            className="group flex items-center gap-2.5 text-[13px] font-medium text-[#0b0d12] bg-white/95 hover:bg-white transition-all duration-200 px-6 py-3 rounded-lg cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
+          >
+            <span>Start the journey</span>
+            <span className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">&rarr;</span>
+          </button>
+          <span className="text-[12px] text-white/35">5 chapters · ~10 min</span>
+        </div>
       </div>
 
       {/* ── Chapters 2–3: Compact bottom-left — always mounted, fades in/out ── */}
@@ -500,30 +384,25 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: targetLevel > 1 && targetLevel <= 3 ? "auto" : "none",
         }}
       >
-        <div className="text-[8px] font-mono font-bold tracking-[0.3em] text-white/40 uppercase mb-2">
-          {currentChapter.tag}
+        <div className={`${EYEBROW} text-[#8aa9ff] mb-2.5`}>
+          Chapter {currentChapter.chapter}
         </div>
-        <div className="flex items-baseline gap-3 mb-1">
-          <span className="text-[11px] font-mono text-[#e8a23a]/55 tracking-widest">
-            {currentChapter.chapter}
-          </span>
-          <h1 className="text-[28px] font-bold leading-none tracking-tight text-white/90">
-            {currentChapter.title}
-          </h1>
-        </div>
-        <div className="text-[11px] font-mono text-white/40 tracking-wider mb-3">
+        <h1 className="text-[28px] font-semibold leading-none tracking-tight text-white/92 mb-1.5">
+          {currentChapter.title}
+        </h1>
+        <div className="text-[12px] text-white/45 mb-3.5">
           {currentChapter.subtitle}
         </div>
-        <div className="w-8 h-px bg-white/20 mb-3" />
-        <p className="text-[12px] leading-[1.7] text-white/55 max-w-[340px]">
+        <p className="text-[12.5px] leading-[1.7] text-white/60 max-w-[340px]">
           {currentChapter.description}
         </p>
         {targetLevel === 2 && (
           <button
             onClick={() => setShowPlayground(true)}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 font-mono font-bold tracking-wider text-[10px] px-4 py-2.5 transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(232,162,58,0.1)] hover:shadow-[0_0_20px_rgba(232,162,58,0.2)]"
+            className="mt-5 flex items-center gap-2 rounded-lg bg-[#5b7cfa] hover:bg-[#6d8cfb] text-white font-medium text-[12px] px-5 py-2.5 transition-colors duration-200 cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
           >
-            <span>⚡ EXPERIENCE FULL DIE</span>
+            <span>Open the interactive die</span>
+            <span aria-hidden>&rarr;</span>
           </button>
         )}
       </div>
@@ -554,7 +433,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
         return (
           <div
-            className="absolute right-8 top-1/2 -translate-y-1/2 z-20 w-[320px] max-h-[65vh] overflow-y-auto rounded-xl border border-white/8 bg-black/50 backdrop-blur-xl p-5 scrollbar-thin"
+            className="panel absolute right-8 top-1/2 -translate-y-1/2 z-20 w-[320px] max-h-[65vh] overflow-y-auto rounded-xl p-5 scrollbar-thin"
             style={{
               opacity: isVisible ? 1 : 0,
               transform: isVisible
@@ -565,17 +444,18 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             }}
           >
             <div className="flex justify-between items-center mb-2">
-              <div className="text-[8px] font-mono font-bold tracking-[0.25em] text-[#e8a23a]/70 uppercase">
-                {selectedTrack !== null ? "Technical Track" : "Block Detail"}
+              <div className={`${EYEBROW} text-[#8aa9ff]`}>
+                {selectedTrack !== null ? "Technical track" : "Block detail"}
               </div>
               <button
                 onClick={() => {
                   setSelectedTrack(null);
                   setSelectedBlock(null);
                 }}
-                className="text-[9px] font-mono text-white/40 hover:text-[#e8a23a] transition-colors cursor-pointer"
+                aria-label="Close panel"
+                className="flex h-6 w-6 items-center justify-center rounded-md text-white/40 hover:text-white/90 hover:bg-white/10 transition-colors cursor-pointer"
               >
-                [CLOSE]
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="text-left text-white/80">
@@ -605,22 +485,19 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             className="group relative flex items-center justify-end gap-2"
           >
             {/* Label on hover */}
-            <span className="absolute right-5 text-[8px] font-mono tracking-widest text-white/50 uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap">
+            <span className="absolute right-6 text-[11px] font-medium text-white/60 opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap">
               {c.title}
             </span>
-            {/* Dot */}
+            {/* Bar */}
             <div
               className="transition-all duration-300 rounded-full"
               style={{
-                width: targetLevel === c.level ? "7px" : "4px",
-                height: targetLevel === c.level ? "7px" : "4px",
+                width: "3px",
+                height: targetLevel === c.level ? "22px" : "10px",
                 backgroundColor:
                   targetLevel === c.level
-                    ? "#e8a23a"
+                    ? "#8aa9ff"
                     : "rgba(255,255,255,0.22)",
-                boxShadow: targetLevel === c.level
-                  ? "0 0 8px rgba(232,162,58,0.6)"
-                  : "none",
               }}
             />
           </button>
@@ -629,7 +506,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Chapter 3: Technical Tracks Menu ───────────────────────────────── */}
       <div
-        className="absolute top-[110px] left-8 z-20 w-[340px] bg-black/55 border border-white/10 backdrop-blur-2xl rounded-2xl p-5 text-left shadow-2xl"
+        className="panel absolute top-[110px] left-8 z-20 w-[340px] rounded-xl p-5 text-left"
         style={{
           opacity: targetLevel === 3 && chapterVisible ? 1 : 0,
           transform: targetLevel === 3 && chapterVisible ? "translateY(0)" : "translateY(-12px)",
@@ -637,11 +514,10 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           transition: "opacity 500ms ease, transform 500ms ease",
         }}
       >
-        <div className="text-[9px] font-mono font-bold tracking-[0.3em] text-[#e8a23a] uppercase mb-2">
-          Technical Publication Tracks
+        <div className={`${EYEBROW} text-[#8aa9ff] mb-4`}>
+          Publication tracks
         </div>
-        <div className="w-12 h-px bg-[#e8a23a]/45 mb-4" />
-        <div className="flex flex-col gap-2.5 max-h-[58vh] overflow-y-auto pr-1 scrollbar-none">
+        <div className="flex flex-col gap-1.5 max-h-[58vh] overflow-y-auto pr-1 scrollbar-none">
           {TRACKS.map((track, idx) => {
             const active = selectedTrack === track.id;
             const numStr = String(idx + 1).padStart(2, "0");
@@ -652,24 +528,24 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                   setSelectedTrack(track.id);
                   setSelectedBlock(null);
                 }}
-                className={`flex items-start gap-4 text-left p-3 rounded-xl transition-all duration-300 border group ${
+                className={`flex items-start gap-3.5 text-left px-3 py-2.5 rounded-lg transition-colors duration-200 group cursor-pointer ${
                   active
-                    ? "bg-[#e8a23a]/12 border-[#e8a23a]/40 shadow-[0_0_15px_rgba(232,162,58,0.08)]"
-                    : "bg-white/[0.01] border-transparent hover:bg-white/[0.04] hover:border-white/8"
+                    ? "bg-[#8aa9ff]/10"
+                    : "hover:bg-white/[0.05]"
                 }`}
               >
-                <span className={`text-[12px] font-mono font-bold tracking-tight transition-colors ${
-                  active ? "text-[#e8a23a]" : "text-white/30 group-hover:text-white/60"
+                <span className={`text-[11px] font-mono mt-0.5 transition-colors ${
+                  active ? "text-[#8aa9ff]" : "text-white/30 group-hover:text-white/55"
                 }`}>
                   {numStr}
                 </span>
                 <div className="flex flex-col">
-                  <span className={`text-[11px] font-bold tracking-wide transition-colors ${
-                    active ? "text-[#e8a23a]" : "text-white/85 group-hover:text-white"
+                  <span className={`text-[12.5px] font-medium transition-colors ${
+                    active ? "text-[#aec3ff]" : "text-white/85 group-hover:text-white"
                   }`}>
                     {track.name}
                   </span>
-                  <span className="text-[9px] text-white/45 leading-relaxed mt-1 font-light">
+                  <span className="text-[11px] text-white/45 leading-snug mt-0.5">
                     {track.desc}
                   </span>
                 </div>
@@ -709,77 +585,77 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         <div className="max-w-[760px] mx-auto flex flex-col gap-8 pr-3">
           {/* Header */}
           <div className="text-center mt-6">
-            <h1 className="text-4xl font-extrabold tracking-[0.35em] text-white/95 uppercase font-mono">
+            <h1 className="article-serif text-[44px] font-semibold tracking-[-0.01em] text-white/95">
               Bits&apos;nBrews
             </h1>
-            <div className="text-[9px] font-mono tracking-[0.3em] text-[#e8a23a] uppercase mt-3">
-              Technical Publication Catalog &amp; Hub
+            <div className={`${EYEBROW} text-[#8aa9ff] mt-2`}>
+              Publication catalog
             </div>
-            <p className="text-xs text-white/45 max-w-lg mx-auto font-light leading-relaxed mt-4">
-              Explore our technical series breaking down silicon, processor design, and engineering strategies. Scroll down to browse all tracks or subscribe to the newsletter.
+            <p className="text-[13px] text-white/55 max-w-lg mx-auto leading-relaxed mt-4">
+              Technical series breaking down silicon, processor design, and engineering
+              trade-offs. Browse the tracks below or subscribe to the newsletter.
             </p>
           </div>
 
           {/* About & Team Row Card */}
-          <div className="bg-white/[0.015] border border-white/5 backdrop-blur-xl rounded-2xl p-6 flex flex-col md:flex-row gap-8 justify-between mt-2 shadow-xl shadow-black/10">
+          <div className="panel rounded-xl p-6 flex flex-col md:flex-row gap-8 justify-between mt-2">
             <div className="flex-1">
-              <div className="text-[10px] font-mono font-bold tracking-[0.2em] text-[#e8a23a] uppercase mb-2">
-                About the Publication
+              <div className={`${EYEBROW} text-white/40 mb-2.5`}>
+                About the publication
               </div>
-              <p className="text-xs leading-[1.7] text-white/55 font-light">
-                Bits&apos;nBrews is an interactive digital engineering museum. We bridge the gap between academic VLSI briefs and practical chip design through beautiful spatial graphics, real-time code pipeline simulations, and deep-dive technical journalism.
+              <p className="text-[13px] leading-[1.7] text-white/60">
+                Bits&apos;nBrews is an interactive digital engineering museum. We bridge the gap between academic VLSI briefs and practical chip design through spatial graphics, real-time pipeline simulations, and deep-dive technical journalism.
               </p>
             </div>
 
-            <div className="w-full md:w-[240px] md:border-l border-white/5 md:pl-6 flex flex-col gap-4">
-              <div className="text-[9px] font-mono font-bold tracking-[0.2em] text-[#e8a23a]/75 uppercase mb-1">
-                Development Team
+            <div className="w-full md:w-[240px] md:border-l border-white/8 md:pl-6 flex flex-col gap-4">
+              <div className={`${EYEBROW} text-white/40 mb-1`}>
+                Team
               </div>
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-baseline">
-                  <span className="text-[11px] font-semibold text-white/80">Dhruv</span>
-                  <span className="text-[8px] font-mono text-white/35 uppercase">Architectural Dev</span>
+                  <span className="text-[12px] font-medium text-white/85">Dhruv</span>
+                  <span className="text-[11px] text-white/40">Architecture</span>
                 </div>
                 <div className="flex justify-between items-baseline">
-                  <span className="text-[11px] font-semibold text-white/80">Gemini Partner</span>
-                  <span className="text-[8px] font-mono text-white/35 uppercase">AI Programmer</span>
+                  <span className="text-[12px] font-medium text-white/85">Gemini Partner</span>
+                  <span className="text-[11px] text-white/40">Engineering</span>
                 </div>
                 <div className="flex justify-between items-baseline">
-                  <span className="text-[11px] font-semibold text-white/80">Parzival Prime</span>
-                  <span className="text-[8px] font-mono text-white/35 uppercase">Graphics Director</span>
+                  <span className="text-[12px] font-medium text-white/85">Parzival Prime</span>
+                  <span className="text-[11px] text-white/40">Graphics</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Section Divider */}
-          <div className="flex items-center gap-4 border-t border-white/5 pt-4">
-            <div className="text-[9px] font-mono font-bold tracking-[0.25em] text-[#e8a23a]/75 uppercase">
-              Technical Content Tracks
+          <div className="flex items-center gap-4 border-t border-white/8 pt-5">
+            <div className={`${EYEBROW} text-white/40`}>
+              Content tracks
             </div>
-            <div className="flex-1 h-px bg-white/5" />
+            <div className="flex-1 h-px bg-white/8" />
           </div>
 
           {/* Tracks List */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             {TRACKS.map((track, idx) => {
               const numStr = String(idx + 1).padStart(2, "0");
               return (
                 <div
                   key={track.id}
-                  className="bg-white/[0.012] border border-white/5 hover:border-[#e8a23a]/15 transition-all duration-300 p-6 rounded-2xl flex gap-6 shadow-md hover:shadow-lg group"
+                  className="panel hover:border-white/16 transition-colors duration-200 p-6 rounded-xl flex gap-6 group"
                 >
-                  <div className="text-3xl font-extrabold text-[#e8a23a]/30 font-mono tracking-tighter leading-none shrink-0 w-12">
+                  <div className="text-[13px] font-mono text-white/30 leading-[1.6] shrink-0 w-8">
                     {numStr}
                   </div>
                   <div className="flex flex-col flex-1 text-left">
-                    <h3 className="text-base font-bold text-white/90 group-hover:text-[#e8a23a] transition-colors">
+                    <h3 className="text-[16px] font-semibold text-white/90 group-hover:text-[#aec3ff] transition-colors">
                       {track.name}
                     </h3>
-                    <p className="text-xs leading-relaxed text-white/50 font-light mt-2.5">
+                    <p className="text-[13px] leading-relaxed text-white/55 mt-2">
                       {track.longSummary}
                     </p>
-
                   </div>
                 </div>
               );
@@ -787,69 +663,28 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           </div>
 
           {/* Subscribe Newsletter Section */}
-          <div className="bg-[#e8a23a]/5 border border-[#e8a23a]/15 card-glowing-border rounded-2xl p-8 text-center mt-6 shadow-xl relative overflow-hidden backdrop-blur-xl transition-all duration-500">
-            {/* Ambient Tech Circuit Background */}
-            <svg className="absolute inset-0 z-0 pointer-events-none opacity-25 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-              <style>{`
-                @keyframes dashOffsetSub {
-                  to {
-                    stroke-dashoffset: -40;
-                  }
-                }
-                .sub-line {
-                  stroke: rgba(232, 162, 58, 0.15);
-                  stroke-width: 1;
-                  stroke-linecap: round;
-                  fill: none;
-                }
-                .sub-flow {
-                  stroke: #e8a23a;
-                  stroke-width: 1.5;
-                  stroke-linecap: round;
-                  stroke-dasharray: 4 20;
-                  animation: dashOffsetSub 3s linear infinite;
-                  fill: none;
-                }
-              `}</style>
-              <path d="M -20,30 H 420 L 460,70 V 180" className="sub-line" />
-              <path d="M -20,30 H 420 L 460,70 V 180" className="sub-flow" />
-              
-              <path d="M 520,10 H 380 L 340,50 V 160" className="sub-line" />
-              <path d="M 520,10 H 380 L 340,50 V 160" className="sub-flow" style={{ animationDelay: "-1.5s" }} />
-              
-              <circle cx="460" cy="70" r="2" fill="#e8a23a" />
-              <circle cx="340" cy="50" r="2" fill="#e8a23a" />
-            </svg>
-
-            <div className="max-w-md mx-auto relative z-10">
-              <div className="text-[9px] font-mono font-bold tracking-[0.3em] text-[#e8a23a] uppercase mb-2">
-                Newsletter Inner Circle
-              </div>
-              <h2 className="text-2xl font-bold tracking-tight text-white/95 mb-2 font-mono uppercase text-glow-gold">
-                Join the Architecture Circle
+          <div className="panel rounded-xl p-8 text-center mt-6">
+            <div className="max-w-md mx-auto">
+              <h2 className="article-serif text-[24px] font-semibold tracking-tight text-white/95 mb-2.5">
+                The newsletter
               </h2>
-              <p className="text-xs text-white/55 leading-relaxed font-light mb-6">
-                Receive weekly exclusive spatial-first writeups on physical silicon layouts, execution pipelines, and instruction-set tradeoffs. No marketing fluff. Written for hardware engineers and systems architects.
+              <p className="text-[13px] text-white/55 leading-relaxed mb-6">
+                Spatial-first writeups on silicon layouts, execution pipelines, and
+                instruction-set trade-offs. Written for engineers and the engineering-curious.
               </p>
 
               {subscribed ? (
                 <div className="py-4 text-center animate-fade-in">
-                  <div className="relative w-12 h-12 mx-auto mb-4 flex items-center justify-center">
-                    {/* Glowing outer pulsing circles */}
-                    <div className="absolute inset-0 rounded-full bg-[#e8a23a]/20 animate-pulse-glow" />
-                    <div className="absolute inset-2 rounded-full bg-[#e8a23a]/30 animate-pulse-glow" style={{ animationDelay: "0.5s" }} />
-                    {/* Golden success circle */}
-                    <div className="relative w-8 h-8 rounded-full bg-black border border-[#e8a23a] flex items-center justify-center shadow-[0_0_15px_rgba(232,162,58,0.4)]">
-                      <svg className="w-4 h-4 text-[#e8a23a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" className="animate-checkmark" />
-                      </svg>
-                    </div>
+                  <div className="relative w-11 h-11 mx-auto mb-4 flex items-center justify-center rounded-full bg-[#5bd6a2]/12 border border-[#5bd6a2]/40">
+                    <svg className="w-4 h-4 text-[#5bd6a2]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" className="animate-checkmark" />
+                    </svg>
                   </div>
-                  <div className="text-[11px] font-mono font-bold tracking-[0.2em] uppercase text-[#e8a23a] text-glow-gold">
-                    Welcome to the Circle
+                  <div className="text-[13px] font-medium text-white/90">
+                    You&apos;re on the list
                   </div>
-                  <p className="text-[10px] text-white/45 mt-2 font-light max-w-xs mx-auto leading-relaxed">
-                    Check your inbox. Your entry to the microarchitecture briefs has been registered.
+                  <p className="text-[12px] text-white/50 mt-1.5 max-w-xs mx-auto leading-relaxed">
+                    Check your inbox to confirm your subscription.
                   </p>
                 </div>
               ) : (
@@ -870,45 +705,33 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your professional email..."
-                      className="flex-1 bg-black/60 border border-white/10 focus:border-[#e8a23a] focus:ring-1 focus:ring-[#e8a23a] outline-none text-xs px-4 py-3 rounded-lg text-white font-mono transition-all duration-300 placeholder-white/25"
+                      placeholder="you@example.com"
+                      aria-label="Email address"
+                      className="flex-1 bg-[#0b0d12] border border-white/12 focus:border-[#8aa9ff] focus:ring-1 focus:ring-[#8aa9ff]/40 outline-none text-[13px] px-4 py-3 rounded-lg text-white transition-colors duration-200 placeholder-white/30"
                       required
                       disabled={submitting}
                     />
                     <button
                       type="submit"
-                      className="bg-[#e8a23a] hover:bg-white text-black font-mono font-bold tracking-widest uppercase text-[9px] px-6 py-3 rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(232,162,58,0.2)] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
+                      className="bg-white/95 hover:bg-white text-[#0b0d12] font-medium text-[13px] px-6 py-3 rounded-lg transition-colors duration-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
                       disabled={submitting}
                     >
                       {submitting ? (
-                        <span className="flex items-center gap-1.5">
-                          <svg className="animate-spin h-3 w-3 text-black" fill="none" viewBox="0 0 24 24">
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                           </svg>
-                          VERIFYING...
+                          Subscribing
                         </span>
                       ) : (
-                        "SUBSCRIBE"
+                        "Subscribe"
                       )}
                     </button>
                   </form>
-                  
-                  {/* Persuasive Silicon Proof Point */}
-                  <div className="mt-6 pt-5 border-t border-white/5 flex flex-col items-center justify-center gap-2">
-                    <span className="text-[8px] font-mono tracking-widest text-white/35 uppercase">
-                      Join 14,200+ hardware practitioners from
-                    </span>
-                    <div className="flex gap-4 items-center opacity-45 grayscale hover:opacity-75 transition-opacity duration-300 mt-0.5">
-                      <span className="text-[9px] font-bold tracking-wider font-mono text-white/80">AMD</span>
-                      <span className="text-white/20">•</span>
-                      <span className="text-[9px] font-bold tracking-wider font-mono text-white/80">NVIDIA</span>
-                      <span className="text-white/20">•</span>
-                      <span className="text-[9px] font-bold tracking-wider font-mono text-white/80">INTEL</span>
-                      <span className="text-white/20">•</span>
-                      <span className="text-[9px] font-bold tracking-wider font-mono text-white/80">APPLE</span>
-                    </div>
-                  </div>
+                  <p className="mt-4 text-[11px] text-white/35">
+                    Published fortnightly. No marketing, unsubscribe anytime.
+                  </p>
                 </>
               )}
             </div>
@@ -928,23 +751,21 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         }}
       >
         {/* Progress bar */}
-        <div className="flex-1 h-px bg-white/[0.07] relative overflow-hidden rounded-full">
+        <div className="flex-1 h-px bg-white/[0.08] relative overflow-hidden rounded-full">
           <div
-            className="absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-in-out"
+            className="absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-in-out bg-[#8aa9ff]/70"
             style={{
               width: `${((targetLevel - 1) / (TOTAL - 1)) * 100}%`,
-              background: "linear-gradient(90deg, rgba(232,162,58,0.25), rgba(232,162,58,0.85))",
-              boxShadow: "0 0 8px rgba(232,162,58,0.35)",
             }}
           />
         </div>
         {/* Chapter counter */}
-        <div className="text-[9px] font-mono text-white/25 tracking-widest shrink-0">
+        <div className="text-[11px] font-mono text-white/35 shrink-0">
           {String(targetLevel).padStart(2, "0")} / {String(TOTAL).padStart(2, "0")}
         </div>
         {/* Scroll hint — fades after first interaction */}
-        <div className="text-[8px] font-mono text-white/20 tracking-[0.2em] uppercase shrink-0">
-          ↑ ↓ scroll or arrow keys
+        <div className="text-[11px] text-white/30 shrink-0">
+          Scroll or use arrow keys
         </div>
       </div>
 
@@ -977,7 +798,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Boot screen — branded cover while shaders compile ─────────────── */}
       <div
-        className="fixed inset-0 z-[80] bg-[#030407] flex flex-col items-center justify-center"
+        className="fixed inset-0 z-[80] bg-[#0b0d12] flex flex-col items-center justify-center"
         style={{
           opacity: booted ? 0 : 1,
           visibility: booted ? "hidden" : "visible",
@@ -985,17 +806,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           transition: "opacity 800ms ease 100ms, visibility 0s linear 1000ms",
         }}
       >
-        <div className="text-[13px] font-mono font-bold tracking-[0.5em] text-white/85 uppercase mb-1">
-          Bits'nBrews
+        <div className="text-[16px] font-semibold tracking-[-0.01em] text-white/90 mb-8">
+          Bits&apos;nBrews
         </div>
-        <div className="text-[8px] font-mono tracking-[0.35em] text-[#e8a23a]/80 uppercase mb-8">
-          Architecture Explorer
-        </div>
-        <div className="w-[180px] h-px bg-white/8 relative overflow-hidden rounded-full">
-          <div className="boot-bar absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-[#e8a23a] to-transparent" />
-        </div>
-        <div className="text-[7px] font-mono tracking-[0.3em] text-white/25 uppercase mt-4">
-          Compiling silicon…
+        <div className="w-[160px] h-[2px] bg-white/10 relative overflow-hidden rounded-full">
+          <div className="boot-bar absolute inset-0 bg-white/70 rounded-full" />
         </div>
       </div>
     </div>

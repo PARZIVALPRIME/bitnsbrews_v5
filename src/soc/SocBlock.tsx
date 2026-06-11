@@ -2,14 +2,14 @@ import * as THREE from "three";
 import { useRef, useState, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Edges, Html, Line } from "@react-three/drei";
-import type { Block } from "./data";
+import { accentFor, type Block } from "./data";
 import { useQuality } from "./quality";
 import { ThermalShader } from "./shaders";
 import { BlockDetail } from "./PlaygroundDetails";
 import { getTrackForBlock } from "../articles";
 
-const AMBER = "#e8a23a";
-const AMBER_C = new THREE.Color(AMBER);
+// Physical copper tone — support rods and metal hardware only.
+const COPPER = "#c79a4e";
 const GAP = 0.08;
 
 // Pre-built cheap edge geometry for potato mode: 12 lines, one draw call.
@@ -46,6 +46,11 @@ export function SocBlock({
 }) {
   const quality = useQuality();
   const isMobile = quality === "mobile";
+
+  // Domain accent: each block family glows in its own color instead of a
+  // uniform amber — the die doubles as its own legend.
+  const accent = accentFor(block);
+  const accentC = useMemo(() => new THREE.Color(accent), [accent]);
 
   const [hovered, setHovered] = useState(false);
 
@@ -163,12 +168,12 @@ export function SocBlock({
       const baseGlow = isMobile ? 0.08 : 0;
 
       if (bodyMat.current) {
-        bodyMat.current.emissive.copy(AMBER_C);
+        bodyMat.current.emissive.copy(accentC);
         bodyMat.current.emissiveIntensity = (glow + baseGlow) * dimFactor * opacity;
         bodyMat.current.opacity = (dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : 1) * opacity;
       }
       if (capMat.current) {
-        capMat.current.emissive.copy(AMBER_C);
+        capMat.current.emissive.copy(accentC);
         capMat.current.emissiveIntensity = (glow * 0.6 + baseGlow) * dimFactor * opacity;
         capMat.current.opacity = (dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : 1) * opacity;
       }
@@ -189,7 +194,6 @@ export function SocBlock({
 
   // The Library (level 4): each main block carries one editorial track card.
   const track = useMemo(() => getTrackForBlock(block.id), [block.id]);
-  const trackCardVisible = false; // Disabled: we show component names only on the die
 
   // Labels: only the 9 major (track-bearing) blocks get always-on labels — DOM
   // overlays are expensive, and 17 of them cluttered the floorplan anyway.
@@ -207,7 +211,7 @@ export function SocBlock({
           <planeGeometry args={[w, d]} />
           <meshBasicMaterial color="#040608" transparent opacity={0.5} />
           <Edges threshold={15}>
-            <lineBasicMaterial color={AMBER} transparent opacity={0.25} />
+            <lineBasicMaterial color="#9aa6ba" transparent opacity={0.2} />
           </Edges>
         </mesh>
       )}
@@ -215,7 +219,7 @@ export function SocBlock({
       {/* support rod */}
       <mesh ref={rod} visible={false}>
         <cylinderGeometry args={[0.03, 0.03, 1, isMobile ? 6 : 8]} />
-        <meshStandardMaterial color="#8a6a2a" metalness={1} roughness={0.2} emissive={AMBER} emissiveIntensity={0.4} />
+        <meshStandardMaterial color="#8a6a2a" metalness={1} roughness={0.2} emissive={COPPER} emissiveIntensity={0.3} />
       </mesh>
 
       {/* lifting body group */}
@@ -250,7 +254,7 @@ export function SocBlock({
           )}
           {!isMobile && (
             <Edges threshold={25} scale={1.002}>
-              <lineBasicMaterial ref={outlineMat} color={AMBER} transparent opacity={selected ? 0.8 : 0.25} />
+              <lineBasicMaterial ref={outlineMat} color={accent} transparent opacity={selected ? 0.8 : 0.25} />
             </Edges>
           )}
         </mesh>
@@ -259,7 +263,7 @@ export function SocBlock({
         {isMobile && (
           <lineSegments position={[0, h / 2, 0]} scale={[w, h, d]}>
             <primitive object={MOBILE_EDGE_GEO} attach="geometry" />
-            <lineBasicMaterial ref={outlineMat} color={AMBER} transparent opacity={selected ? 0.65 : 0.3} />
+            <lineBasicMaterial ref={outlineMat} color={accent} transparent opacity={selected ? 0.65 : 0.3} />
           </lineSegments>
         )}
 
@@ -288,14 +292,14 @@ export function SocBlock({
           <>
             <Line
               points={[anchor, labelPt]}
-              color={AMBER}
+              color={accent}
               lineWidth={1}
               transparent
               opacity={(selected ? 0.9 : 0.45) * opacity}
             />
             <mesh position={anchor}>
               <sphereGeometry args={[0.06, isMobile ? 6 : 10, isMobile ? 6 : 10]} />
-              <meshBasicMaterial color={AMBER} transparent opacity={0.95 * opacity} />
+              <meshBasicMaterial color={accent} transparent opacity={0.95 * opacity} />
             </mesh>
             <Html
               position={labelPt}
@@ -315,20 +319,18 @@ export function SocBlock({
                 className="pointer-events-auto select-none whitespace-nowrap cursor-pointer text-left block bg-transparent border-0 p-0"
               >
                 <div
-                  className="rounded-md px-1.5 py-0.5 hover:border-[#e8a23a]/50 transition-colors duration-200"
+                  className="rounded-md px-1.5 py-0.5 transition-colors duration-200"
                   style={{
-                    background: "rgba(6,8,12,0.92)",
-                    border: `0.5px solid rgba(232,162,58,${selected ? 0.55 : 0.15})`,
-                    boxShadow: selected
-                      ? "0 0 10px rgba(232,162,58,0.18), 0 1px 3px rgba(0,0,0,0.55)"
-                      : "0 1px 3px rgba(0,0,0,0.3)",
+                    background: "rgba(15,18,26,0.94)",
+                    border: `0.5px solid ${selected ? accent : "rgba(255,255,255,0.14)"}`,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
                     opacity: opacity,
                   }}
                 >
                   <div
-                    className="font-bold uppercase tracking-[0.13em] leading-none"
+                    className="font-semibold leading-none"
                     style={{
-                      color: selected ? "#f0d090" : "#c8bba5",
+                      color: selected ? "#f4f6fa" : "rgba(235,240,250,0.78)",
                       fontSize: selected ? "8px" : "7px",
                     }}
                   >
@@ -336,15 +338,15 @@ export function SocBlock({
                   </div>
                   {selected && (
                     <div
-                      className="mt-0.5 font-light tracking-wide leading-none"
-                      style={{ color: "#8a8072", fontSize: "6px" }}
+                      className="mt-0.5 leading-none"
+                      style={{ color: "rgba(226,232,244,0.5)", fontSize: "6px" }}
                     >
                       {block.fn}
                     </div>
                   )}
                   <div
-                    className="mt-px font-mono tracking-widest leading-none"
-                    style={{ color: selected ? "#e8a23a" : "#5a5448", fontSize: "5.5px" }}
+                    className="mt-px font-mono leading-none"
+                    style={{ color: selected ? accent : "rgba(226,232,244,0.35)", fontSize: "5.5px" }}
                   >
                     {block.w.toFixed(1)}×{block.d.toFixed(1)}×{h.toFixed(1)}u
                   </div>

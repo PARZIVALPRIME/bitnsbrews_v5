@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { BLOCKS } from "./data";
 
 export interface ZoomLevel {
   id: number;
@@ -61,7 +60,7 @@ export const ZOOM_LEVELS: ZoomLevel[] = [
 
 export function getCameraParamsForLevel(
   level: number,
-  selectedBlockCoords: { cx: number; cz: number; h: number } | null
+  _selectedBlockCoords: { cx: number; cz: number; h: number } | null
 ): { position: THREE.Vector3; target: THREE.Vector3; fov: number } {
   const current = ZOOM_LEVELS.find((l) => l.id === level) || ZOOM_LEVELS[2];
   const position = new THREE.Vector3(...current.defaultPosition);

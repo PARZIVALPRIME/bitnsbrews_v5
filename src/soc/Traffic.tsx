@@ -2,10 +2,8 @@ import * as THREE from "three";
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { BLOCKS, TRAFFIC_PATHS, SocMode } from "./data";
+import { accentFor, BLOCKS, TRAFFIC_PATHS, SocMode } from "./data";
 import { useQuality } from "./quality";
-
-const AMBER = "#e8a23a";
 
 /* ---------- shader: a thin tube with a flowing gradient ---------- */
 
@@ -200,7 +198,7 @@ export function TrafficNetwork({ mode, t }: { mode: SocMode; t: number }) {
             key={`${path.from}-${path.to}-${mode}`}
             from={start}
             to={end}
-            color={AMBER}
+            color={accentFor(from)}
             bandwidth={SOURCE_BANDWIDTH[from.id]}
           />
         );

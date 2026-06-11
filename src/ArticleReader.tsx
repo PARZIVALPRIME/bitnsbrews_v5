@@ -17,7 +17,7 @@ function renderInline(text: string): ReactNode[] {
       out.push(
         <code
           key={i}
-          className="font-mono text-[0.85em] text-[#f0c478] bg-[#e8a23a]/8 border border-[#e8a23a]/15 rounded px-1.5 py-0.5 whitespace-nowrap"
+          className="font-mono text-[0.85em] text-[#aec3ff] bg-[#8aa9ff]/10 border border-[#8aa9ff]/15 rounded px-1.5 py-0.5 whitespace-nowrap"
         >
           {tok.slice(1, -1)}
         </code>
@@ -46,8 +46,7 @@ function Segment({ seg }: { seg: ArticleSegment }) {
 
     case "h2":
       return (
-        <h2 className="article-serif text-[26px] font-semibold tracking-[-0.01em] text-white/95 mt-14 mb-6 flex items-baseline gap-4">
-          <span className="w-6 h-px bg-[#e8a23a]/60 shrink-0 translate-y-[-6px]" />
+        <h2 className="article-serif text-[26px] font-semibold tracking-[-0.01em] text-white/95 mt-14 mb-6">
           {seg.text}
         </h2>
       );
@@ -58,9 +57,9 @@ function Segment({ seg }: { seg: ArticleSegment }) {
           {seg.items.map((item) => (
             <div
               key={item.term}
-              className="rounded-xl border border-white/8 bg-white/[0.02] p-5 hover:border-[#e8a23a]/25 transition-colors duration-300"
+              className="rounded-xl border border-white/8 bg-white/[0.02] p-5"
             >
-              <div className="text-[10px] font-mono font-bold tracking-[0.2em] text-[#e8a23a] uppercase mb-2.5">
+              <div className="text-[11px] font-medium tracking-[0.08em] text-[#8aa9ff] uppercase mb-2.5">
                 {item.term}
               </div>
               <p className="article-serif text-[14.5px] leading-[1.7] text-white/65">
@@ -75,13 +74,13 @@ function Segment({ seg }: { seg: ArticleSegment }) {
       return (
         <figure className="my-8">
           {seg.caption && (
-            <figcaption className="text-[9px] font-mono font-bold tracking-[0.25em] text-white/35 uppercase mb-2">
+            <figcaption className="text-[11px] font-medium text-white/40 mb-2">
               {seg.caption}
             </figcaption>
           )}
-          <pre className="rounded-xl border border-white/8 border-l-2 border-l-[#e8a23a]/60 bg-[#0a0c12] px-5 py-4 overflow-x-auto scrollbar-thin">
+          <pre className="rounded-xl border border-white/8 bg-[#0e1118] px-5 py-4 overflow-x-auto scrollbar-thin">
             {seg.lines.map((line, i) => (
-              <code key={i} className="block font-mono text-[13.5px] leading-[1.8] text-[#f0c478]">
+              <code key={i} className="block font-mono text-[13.5px] leading-[1.8] text-[#cdd9f2]">
                 {line}
               </code>
             ))}
@@ -94,7 +93,7 @@ function Segment({ seg }: { seg: ArticleSegment }) {
         <ul className="my-7 flex flex-col gap-3">
           {seg.items.map((item, i) => (
             <li key={i} className="flex gap-4 items-baseline">
-              <span className="w-1 h-1 rounded-full bg-[#e8a23a]/70 shrink-0 translate-y-[-3px]" />
+              <span className="w-1 h-1 rounded-full bg-white/40 shrink-0 translate-y-[-3px]" />
               <span className="article-serif text-[16px] leading-[1.75] text-white/65">
                 {renderInline(item)}
               </span>
@@ -105,24 +104,14 @@ function Segment({ seg }: { seg: ArticleSegment }) {
 
     case "challenge":
       return (
-        <aside className="relative my-10 rounded-2xl border border-[#e8a23a]/20 bg-gradient-to-br from-[#e8a23a]/[0.06] to-transparent p-7 overflow-hidden challenge-card">
-          {/* faint grid texture */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-[0.04]"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(232,162,58,1) 1px, transparent 1px), linear-gradient(90deg, rgba(232,162,58,1) 1px, transparent 1px)",
-              backgroundSize: "22px 22px",
-            }}
-          />
+        <aside className="relative my-10 rounded-xl border border-white/8 border-l-2 border-l-[#8aa9ff]/70 bg-white/[0.025] p-7">
           <div className="relative flex items-center gap-3 mb-4">
-            <span className="flex items-center justify-center w-7 h-7 rounded-md border border-[#e8a23a]/45 bg-[#e8a23a]/10 font-mono font-bold text-[12px] text-[#e8a23a]">
+            <span className="flex items-center justify-center w-7 h-7 rounded-md bg-[#8aa9ff]/12 font-mono text-[12px] text-[#8aa9ff]">
               {seg.n}
             </span>
-            <span className="text-[10px] font-mono font-bold tracking-[0.3em] text-[#e8a23a] uppercase">
-              Whiteboard Challenge
+            <span className="text-[11px] font-medium tracking-[0.1em] text-[#8aa9ff] uppercase">
+              Whiteboard challenge
             </span>
-            <span className="flex-1 h-px bg-[#e8a23a]/15" />
           </div>
           {seg.body.map((para, i) => (
             <p
@@ -159,36 +148,34 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-[#050609]/98 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] bg-[#0b0d12]"
       style={{
         opacity: entered ? 1 : 0,
         transition: "opacity 400ms ease",
       }}
     >
       {/* Reading progress */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] z-10 bg-white/[0.05]">
+      <div className="absolute top-0 left-0 right-0 h-[2px] z-10 bg-white/[0.06]">
         <div
-          className="h-full bg-[#e8a23a] shadow-[0_0_8px_rgba(232,162,58,0.6)]"
+          className="h-full bg-[#8aa9ff]"
           style={{ width: `${progress * 100}%`, transition: "width 80ms linear" }}
         />
       </div>
 
       {/* Top chrome */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-6 sm:px-10 h-16 bg-gradient-to-b from-[#050609] via-[#050609]/85 to-transparent pointer-events-none">
-        <div className="text-[10px] font-mono font-semibold tracking-[0.35em] text-white/30 uppercase">
-          Bits'nBrews
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-6 sm:px-10 h-16 bg-gradient-to-b from-[#0b0d12] via-[#0b0d12]/85 to-transparent pointer-events-none">
+        <div className="text-[13px] font-semibold tracking-[-0.01em] text-white/50">
+          Bits&apos;nBrews
         </div>
         <button
           onClick={onClose}
-          className="pointer-events-auto group flex items-center gap-2.5 text-[10px] font-mono font-bold tracking-[0.2em] uppercase text-white/45 hover:text-[#e8a23a] border border-white/10 hover:border-[#e8a23a]/40 rounded-md px-4 py-2 transition-all duration-200 cursor-pointer bg-black/40 backdrop-blur-md"
+          className="pointer-events-auto group flex items-center gap-2 text-[12px] font-medium text-white/55 hover:text-white/90 border border-white/12 hover:border-white/25 rounded-lg px-4 py-2 transition-colors duration-200 cursor-pointer bg-[#12151d]"
         >
           <span className="inline-block transition-transform duration-200 group-hover:-translate-x-0.5">
             ←
           </span>
-          <span>Back to die</span>
-          <span className="text-white/20 group-hover:text-[#e8a23a]/40 normal-case tracking-normal">
-            esc
-          </span>
+          <span>Back to the die</span>
+          <kbd className="text-[10px] text-white/30 font-mono">esc</kbd>
         </button>
       </div>
 
@@ -213,8 +200,8 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
           {/* Header */}
           <header className="mb-14">
             <div className="flex items-center gap-3 mb-7">
-              <span className="text-[9px] font-mono font-bold tracking-[0.25em] text-[#e8a23a] uppercase bg-[#e8a23a]/8 border border-[#e8a23a]/25 px-3 py-1.5 rounded-sm">
-                Track {article.trackNo} — {article.track}
+              <span className="text-[11px] font-medium tracking-[0.08em] text-[#8aa9ff] uppercase">
+                {article.track} · No. {article.trackNo}
               </span>
             </div>
             <h1 className="article-serif text-[38px] sm:text-[46px] font-bold leading-[1.12] tracking-[-0.02em] text-white/95 mb-5">
@@ -224,12 +211,12 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
               {article.subtitle}
             </p>
             <div className="flex items-center gap-4 pt-6 border-t border-white/8">
-              <div className="w-9 h-9 rounded-full bg-[#e8a23a]/15 border border-[#e8a23a]/30 flex items-center justify-center font-mono font-bold text-[13px] text-[#e8a23a]">
+              <div className="w-9 h-9 rounded-full bg-white/8 border border-white/15 flex items-center justify-center font-medium text-[13px] text-white/80">
                 {article.author[0]}
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-[12px] font-semibold text-white/85">{article.author}</span>
-                <span className="text-[10px] font-mono tracking-wider text-white/35">
+                <span className="text-[12.5px] font-medium text-white/85">{article.author}</span>
+                <span className="text-[11.5px] text-white/40">
                   {article.date} · {article.readTime}
                 </span>
               </div>
@@ -244,21 +231,21 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
           {/* End mark + footer */}
           <footer className="mt-16">
             <div className="flex items-center gap-3 justify-center mb-12">
-              <span className="w-10 h-px bg-white/10" />
-              <span className="w-1.5 h-1.5 rotate-45 bg-[#e8a23a]/60" />
-              <span className="w-10 h-px bg-white/10" />
+              <span className="w-10 h-px bg-white/12" />
+              <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+              <span className="w-10 h-px bg-white/12" />
             </div>
-            <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-7 text-center">
-              <div className="text-[9px] font-mono font-bold tracking-[0.3em] text-[#e8a23a] uppercase mb-3">
-                Track {article.trackNo} — {article.track}
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-7 text-center">
+              <div className="text-[11px] font-medium tracking-[0.08em] text-[#8aa9ff] uppercase mb-3">
+                {article.track}
               </div>
-              <p className="article-serif text-[14px] leading-[1.7] text-white/55 max-w-md mx-auto mb-6">
-                More pieces in this track are in fabrication. Subscribe from the Hub to get them
-                the moment they tape out.
+              <p className="text-[13.5px] leading-[1.7] text-white/55 max-w-md mx-auto mb-6">
+                More pieces in this track are on the way. Subscribe from the Hub to get
+                them as they publish.
               </p>
               <button
                 onClick={onClose}
-                className="text-[10px] font-mono font-bold tracking-[0.25em] uppercase text-[#e8a23a]/90 hover:text-white border border-[#e8a23a]/30 hover:border-white/60 px-6 py-2.5 rounded-md transition-all duration-200 cursor-pointer"
+                className="text-[12px] font-medium text-white/70 hover:text-white border border-white/15 hover:border-white/35 px-6 py-2.5 rounded-lg transition-colors duration-200 cursor-pointer"
               >
                 ← Back to the die
               </button>

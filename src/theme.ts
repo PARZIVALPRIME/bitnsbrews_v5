@@ -10,12 +10,12 @@ export type ThemeColors = {
 };
 
 export const defaultTheme: ThemeColors = {
-  background: "#030407",
-  accent: "#e8a23a",
-  textPrimary: "#ffffff",
-  textMuted: "rgba(255,255,255,0.7)",
-  panelBackground: "rgba(3,4,7,0.85)",
-  panelBorder: "rgba(255,255,255,0.05)",
+  background: "#0b0d12",
+  accent: "#8aa9ff",
+  textPrimary: "#f4f6fa",
+  textMuted: "rgba(226,232,244,0.66)",
+  panelBackground: "rgba(15,18,26,0.94)",
+  panelBorder: "rgba(255,255,255,0.08)",
 };
 
 export const ThemeContext = createContext<ThemeColors>(defaultTheme);

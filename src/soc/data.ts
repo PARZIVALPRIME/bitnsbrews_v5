@@ -41,6 +41,26 @@ export interface Block {
 
 export type SocMode = "Idle" | "Gaming" | "AI" | "Camera" | "Web" | "Video";
 
+// Per-domain accent colors — drive emissive glow, selection outlines, labels,
+// legends, and traffic streams. Keyed by DetailKind so LPDDR channels share one.
+export const DOMAIN_ACCENTS: Record<DetailKind, string> = {
+  cpuBig: "#6d9bff",
+  cpuEff: "#57c2b4",
+  gpu: "#a78bfa",
+  npu: "#f277a8",
+  modem: "#e8a05c",
+  isp: "#62c46f",
+  dsp: "#4fc1a6",
+  video: "#45b890",
+  slc: "#4fc3e8",
+  memctrl: "#58a8dc",
+  pmu: "#b9c2d0",
+  lpddr: "#7c90b0",
+  ioring: "#93a1b5",
+};
+
+export const accentFor = (b: Block): string => DOMAIN_ACCENTS[b.detail];
+
 // Utilization (0..1) for each block in each scenario — drives emissive glow.
 export const UTILIZATION: Record<string, Record<SocMode, number>> = {
   "cpu-big":  { Idle: 0.02, Gaming: 0.75, AI: 0.15, Camera: 0.10, Web: 0.30, Video: 0.20 },

@@ -23,7 +23,7 @@ function Die() {
         <boxGeometry args={[dieW, 0.6, dieD]} />
         <meshStandardMaterial color="#0c0f16" metalness={0.9} roughness={0.4} />
         <Edges threshold={20} scale={1.001}>
-          <lineBasicMaterial color="#e8a23a" transparent opacity={0.3} />
+          <lineBasicMaterial color="#c79a4e" transparent opacity={0.3} />
         </Edges>
       </mesh>
 
@@ -40,7 +40,7 @@ function Die() {
       ].map(([x, y, z, w, h, d], i) => (
         <mesh key={i} position={[x, y, z]}>
           <boxGeometry args={[w, h, d]} />
-          <meshStandardMaterial color="#e8a23a" emissive="#e8a23a" emissiveIntensity={1.5} metalness={1} roughness={0.1} />
+          <meshStandardMaterial color="#c79a4e" emissive="#c79a4e" emissiveIntensity={1.5} metalness={1} roughness={0.1} />
         </mesh>
       ))}
 
@@ -53,7 +53,7 @@ function Die() {
         <boxGeometry args={[baseW, 0.4, baseD]} />
         <meshStandardMaterial color="#040508" metalness={0.7} roughness={0.6} />
         <Edges threshold={20}>
-          <lineBasicMaterial color="#e8a23a" transparent opacity={0.15} />
+          <lineBasicMaterial color="#c79a4e" transparent opacity={0.15} />
         </Edges>
       </mesh>
     </group>
@@ -83,7 +83,7 @@ export function SceneMobile({
 
       <directionalLight position={[-10, 20, 15]} intensity={2.5} color="#fff5e0" />
       <directionalLight position={[12, 10, -5]} intensity={1.0} color="#a0c0ff" />
-      <directionalLight position={[-5, 5, -20]} intensity={1.8} color="#e8a23a" />
+      <directionalLight position={[-5, 5, -20]} intensity={1.8} color="#c79a4e" />
 
       <Environment resolution={256}>
         <Lightformer intensity={4.5} color="#ffffff" position={[-10, 10, 5]} scale={[15, 15, 1]} />

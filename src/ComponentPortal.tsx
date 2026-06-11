@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { getComponent, getArticle, type ComponentMetadata } from "./articles";
+import { useEffect, useState, type ReactNode } from "react";
+import { getComponent, getArticle } from "./articles";
+import { DOMAIN_ACCENTS } from "./soc/data";
 
 interface ComponentPortalProps {
   componentId: string;
@@ -7,17 +8,113 @@ interface ComponentPortalProps {
   onReadArticle: (articleId: string) => void;
 }
 
-const ICONS: Record<string, string> = {
-  "cpu-big": "⚡",
-  "cpu-eff": "🍃",
-  gpu: "🎮",
-  npu: "🧠",
-  modem: "📡",
-  isp: "📷",
-  dsp: "🔊",
-  slc: "🕸️",
-  memctrl: "💾",
+// Per-component accent — same domain colors the 3D die uses.
+const ACCENTS: Record<string, string> = {
+  "cpu-big": DOMAIN_ACCENTS.cpuBig,
+  "cpu-eff": DOMAIN_ACCENTS.cpuEff,
+  gpu: DOMAIN_ACCENTS.gpu,
+  npu: DOMAIN_ACCENTS.npu,
+  modem: DOMAIN_ACCENTS.modem,
+  isp: DOMAIN_ACCENTS.isp,
+  dsp: DOMAIN_ACCENTS.dsp,
+  slc: DOMAIN_ACCENTS.slc,
+  memctrl: DOMAIN_ACCENTS.memctrl,
 };
+
+// Minimal line icons (24×24, stroke 1.5) — one consistent family, no emoji.
+const ICON_PATHS: Record<string, ReactNode> = {
+  "cpu-big": (
+    <>
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+      <rect x="10" y="10" width="4" height="4" />
+      <path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" />
+    </>
+  ),
+  "cpu-eff": (
+    <>
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+      <path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" />
+      <path d="M12 9v3l2 2" />
+    </>
+  ),
+  gpu: (
+    <>
+      <rect x="4" y="6" width="16" height="12" rx="1.5" />
+      <path d="M8 6v12M12 6v12M16 6v12M4 10h16M4 14h16" />
+    </>
+  ),
+  npu: (
+    <>
+      <circle cx="6" cy="6" r="2" />
+      <circle cx="18" cy="6" r="2" />
+      <circle cx="6" cy="18" r="2" />
+      <circle cx="18" cy="18" r="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M7.6 7.6 9.9 9.9M16.4 7.6 14.1 9.9M7.6 16.4 9.9 14.1M16.4 16.4 14.1 14.1" />
+    </>
+  ),
+  modem: (
+    <>
+      <path d="M12 18v3" />
+      <circle cx="12" cy="17" r="1.2" />
+      <path d="M8.5 13.5a5 5 0 0 1 7 0M5.6 10.6a9 9 0 0 1 12.8 0M2.8 7.8a13 13 0 0 1 18.4 0" />
+    </>
+  ),
+  isp: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M12 4v4.5M19.2 8.4l-4 2.2M16.8 18.9 14 15.2M7.2 18.9 10 15.2M4.8 8.4l4 2.2" />
+    </>
+  ),
+  dsp: (
+    <>
+      <path d="M3 12h3l2-6 4 12 2-6h2" />
+      <path d="M18 12h3" />
+    </>
+  ),
+  slc: (
+    <>
+      <path d="M12 3 4 7l8 4 8-4-8-4Z" />
+      <path d="M4 12l8 4 8-4" />
+      <path d="M4 17l8 4 8-4" />
+    </>
+  ),
+  memctrl: (
+    <>
+      <rect x="3" y="8" width="18" height="8" rx="1.5" />
+      <path d="M7 8v8M11 8v8M15 8v8M19 8v8" opacity="0.6" />
+      <path d="M6 16v3M10 16v3M14 16v3M18 16v3" />
+    </>
+  ),
+};
+
+function ComponentIcon({ id, color }: { id: string; color: string }) {
+  return (
+    <svg
+      width="26"
+      height="26"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {ICON_PATHS[id] ?? ICON_PATHS["cpu-big"]}
+    </svg>
+  );
+}
+
+function SpecRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-2.5 border-b border-white/6 last:border-b-0">
+      <span className="text-[12px] text-white/45">{label}</span>
+      <span className="text-[12.5px] font-mono text-white/85 text-right">{value}</span>
+    </div>
+  );
+}
 
 export function ComponentPortal({ componentId, onClose, onReadArticle }: ComponentPortalProps) {
   const [entered, setEntered] = useState(false);
@@ -39,38 +136,37 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
 
   const basicArticle = getArticle(comp.basicArticleId);
   const advancedArticle = getArticle(comp.advancedArticleId);
-  const icon = ICONS[comp.id] || "🔬";
+  const accent = ACCENTS[comp.id] ?? "#8aa9ff";
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#050609]/95 backdrop-blur-md transition-opacity duration-300 p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0d12]/85 backdrop-blur-sm transition-opacity duration-300 p-4 sm:p-8"
       style={{ opacity: entered ? 1 : 0 }}
+      onClick={onClose}
     >
-      {/* Outer ambient decorative glowing grid lines */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#e8a23a]/5 blur-[100px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#e8a23a]/3 blur-[100px]" />
-      </div>
-
-      {/* Main Glass Panel Container */}
+      {/* Main panel */}
       <div
-        className="relative w-full max-w-[1000px] max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#06080d]/85 backdrop-blur-2xl p-6 sm:p-10 shadow-[0_0_60px_rgba(232,162,58,0.12)] flex flex-col gap-8 scrollbar-thin z-10 transition-transform duration-500 ease-out tech-grid-bg"
-        style={{ transform: entered ? "scale(1) translateY(0)" : "scale(0.95) translateY(10px)" }}
+        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_2px_6px_rgba(0,0,0,0.4),0_24px_64px_rgba(0,0,0,0.5)] flex flex-col gap-8 scrollbar-thin transition-transform duration-400 ease-out"
+        style={{ transform: entered ? "scale(1) translateY(0)" : "scale(0.97) translateY(8px)" }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Header Block */}
-        <div className="flex items-start justify-between border-b border-white/5 pb-6">
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-white/8 pb-6">
           <div className="flex items-center gap-4">
-            <span className="text-4xl flex items-center justify-center p-3 rounded-2xl bg-[#e8a23a]/10 border border-[#e8a23a]/25 shadow-[0_0_15px_rgba(232,162,58,0.2)]">
-              {icon}
+            <span
+              className="flex items-center justify-center w-14 h-14 rounded-xl border shrink-0"
+              style={{ borderColor: `${accent}40`, background: `${accent}14` }}
+            >
+              <ComponentIcon id={comp.id} color={accent} />
             </span>
             <div className="text-left">
-              <span className="text-[9px] font-mono font-bold tracking-[0.3em] text-[#e8a23a] uppercase">
+              <span className="text-[11px] font-medium tracking-[0.1em] uppercase" style={{ color: accent }}>
                 {comp.tag}
               </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mt-1">
+              <h1 className="text-2xl sm:text-[28px] font-semibold tracking-tight text-white mt-1">
                 {comp.name}
               </h1>
-              <p className="text-xs text-white/50 font-light mt-1 max-w-[600px]">
+              <p className="text-[13px] text-white/55 mt-1 max-w-[560px] leading-relaxed">
                 {comp.shortDesc}
               </p>
             </div>
@@ -78,196 +174,123 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
 
           <button
             onClick={onClose}
-            className="cyber-button text-[10px] font-mono font-bold tracking-[0.25em] uppercase rounded-lg px-4 py-2 transition-all duration-200 cursor-pointer"
+            aria-label="Close (Esc)"
+            className="flex items-center gap-2 text-[12px] text-white/50 hover:text-white/90 border border-white/12 hover:border-white/25 rounded-lg px-3.5 py-2 transition-colors duration-200 cursor-pointer shrink-0"
           >
-            <span>[CLOSE]</span>
-            <span className="text-white/20 normal-case tracking-normal ml-1">esc</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            <span>Close</span>
+            <kbd className="text-[10px] text-white/30 font-mono">esc</kbd>
           </button>
         </div>
 
-        {/* Content Section: Specs (Left) & Articles (Right) */}
+        {/* Content */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 text-left">
-          
-          {/* Left Column (5/12 cols) - Specs & Textbook Omission */}
-          <div className="md:col-span-5 flex flex-col gap-6">
-            
-            {/* Technical Specifications Card with live animated telemetry */}
-            <div className="cyber-card p-6 shadow-2xl relative overflow-hidden tech-grid-bg">
-              {/* Decorative target crosshairs */}
-              <div className="absolute top-2 right-2 font-mono text-[7px] text-[#e8a23a]/30">[SEC_SYS_09]</div>
-              
-              <h3 className="text-[10px] font-mono font-bold tracking-[0.2em] text-[#e8a23a] uppercase border-b border-white/5 pb-2.5 mb-4 flex items-center justify-between">
-                <span>📟 Telemetry &amp; Specs</span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[7px] text-emerald-500 font-bold uppercase tracking-widest">Online</span>
-                </span>
-              </h3>
-              
-              <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                <div>
-                  <div className="text-[7.5px] font-mono text-white/30 uppercase tracking-widest">Die Area</div>
-                  <div className="text-sm font-semibold text-white/85 font-mono mt-0.5">{comp.area}</div>
-                </div>
-                <div>
-                  <div className="text-[7.5px] font-mono text-white/30 uppercase tracking-widest">Clock Freq</div>
-                  <div className="text-sm font-semibold text-white/85 font-mono mt-0.5">{comp.clockSpeed}</div>
-                </div>
-                <div>
-                  <div className="text-[7.5px] font-mono text-white/30 uppercase tracking-widest">Lithography</div>
-                  <div className="text-sm font-semibold text-white/85 font-mono mt-0.5">{comp.process}</div>
-                </div>
-                <div>
-                  <div className="text-[7.5px] font-mono text-white/30 uppercase tracking-widest">Power Target</div>
-                  <div className="text-sm font-semibold text-[#e8a23a]/80 font-mono mt-0.5 truncate">{comp.powerFocus}</div>
-                </div>
-              </div>
 
-              {/* Animated Telemetry Graph Wave */}
-              <div className="mt-6 border-t border-white/5 pt-4 flex flex-col gap-2">
-                <div className="flex justify-between items-center text-[7.5px] font-mono text-white/25">
-                  <span>REAL-TIME UTILIZATION SIGNAL</span>
-                  <span className="animate-pulse">SWEEPING...</span>
-                </div>
-                <div className="h-10 w-full bg-black/40 rounded-lg overflow-hidden border border-white/5 relative">
-                  <svg className="w-full h-full opacity-60" viewBox="0 0 100 20" preserveAspectRatio="none">
-                    <path
-                      d="M 0 10 Q 12.5 2, 25 10 T 50 10 T 75 10 T 100 10"
-                      fill="none"
-                      stroke="#e8a23a"
-                      strokeWidth="0.75"
-                    >
-                      <animate
-                        attributeName="d"
-                        values="M 0 10 Q 12.5 2, 25 10 T 50 10 T 75 10 T 100 10;
-                                M 0 10 Q 12.5 18, 25 10 T 50 10 T 75 10 T 100 10;
-                                M 0 10 Q 12.5 2, 25 10 T 50 10 T 75 10 T 100 10"
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                    </path>
-                    <path
-                      d="M 0 10 Q 12.5 15, 25 10 T 50 10 T 75 10 T 100 10"
-                      fill="none"
-                      stroke="rgba(232, 162, 58, 0.25)"
-                      strokeWidth="0.5"
-                    >
-                      <animate
-                        attributeName="d"
-                        values="M 0 10 Q 12.5 15, 25 10 T 50 10 T 75 10 T 100 10;
-                                M 0 10 Q 12.5 5, 25 10 T 50 10 T 75 10 T 100 10;
-                                M 0 10 Q 12.5 15, 25 10 T 50 10 T 75 10 T 100 10"
-                        dur="2s"
-                        repeatCount="indefinite"
-                      />
-                    </path>
-                  </svg>
-                  {/* Sweep scan bar overlay */}
-                  <div className="absolute top-0 bottom-0 w-px bg-[#e8a23a]/50 shadow-[0_0_8px_#e8a23a] animate-sweep" style={{ left: "0%" }} />
-                </div>
-              </div>
+          {/* Left column — specs + textbook gap */}
+          <div className="md:col-span-5 flex flex-col gap-5">
+            <div className="rounded-xl border border-white/8 bg-[#0e1118] p-5">
+              <h3 className="text-[11px] font-medium tracking-[0.1em] text-white/45 uppercase pb-3 border-b border-white/8 mb-1">
+                Specifications
+              </h3>
+              <SpecRow label="Die area" value={comp.area} />
+              <SpecRow label="Clock frequency" value={comp.clockSpeed} />
+              <SpecRow label="Lithography" value={comp.process} />
+              <SpecRow label="Power profile" value={comp.powerFocus} />
             </div>
 
-            {/* The Textbook Gap Card with Cyber brackets */}
-            <div className="border border-white/5 bg-white/[0.012] rounded-2xl p-5 shadow-xl shadow-black/10 relative overflow-hidden group hover:border-[#e8a23a]/20 transition-all duration-300">
-              <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-[#e8a23a]/50" />
-              <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-[#e8a23a]/50" />
-              
-              <h3 className="text-[10px] font-mono font-bold tracking-[0.2em] text-[#e8a23a] uppercase mb-2 flex items-center gap-1.5">
-                📝 What Textbooks Omit
+            <div className="rounded-xl border border-white/8 bg-[#0e1118] p-5">
+              <h3 className="text-[11px] font-medium tracking-[0.1em] text-white/45 uppercase mb-3">
+                What textbooks omit
               </h3>
-              <p className="text-[11.5px] leading-[1.65] text-white/60 font-light">
+              <p className="text-[13px] leading-[1.7] text-white/65">
                 {comp.textbookOmission}
               </p>
             </div>
           </div>
 
-          {/* Right Column (7/12 cols) - Curated Articles Set */}
-          <div className="md:col-span-7 flex flex-col gap-5">
-            <h3 className="text-[10px] font-mono font-bold tracking-[0.2em] text-[#e8a23a] uppercase mb-1">
-              📚 Component Learning Path
+          {/* Right column — learning path */}
+          <div className="md:col-span-7 flex flex-col gap-4">
+            <h3 className="text-[11px] font-medium tracking-[0.1em] text-white/45 uppercase">
+              Learning path
             </h3>
 
-            {/* Card 1: The Basics (Concept Fundamentals) */}
+            {/* Step 1 — basics */}
             {basicArticle ? (
-              <div
+              <button
                 onClick={() => onReadArticle(basicArticle.id)}
-                className="cyber-card p-5 cursor-pointer flex flex-col gap-3 shadow-md hover:shadow-lg"
+                className="group rounded-xl border border-white/8 bg-[#0e1118] hover:border-white/20 hover:bg-[#11141d] p-5 cursor-pointer flex flex-col gap-3 text-left transition-colors duration-200"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[8px] font-mono font-bold tracking-[0.25em] text-[#e8a23a] uppercase bg-[#e8a23a]/10 border border-[#e8a23a]/20 px-2 py-0.5 rounded-sm">
-                    Step 1 — Concept Fundamentals
+                  <span className="text-[11px] font-medium" style={{ color: accent }}>
+                    Step 1 · Fundamentals
                   </span>
-                  <span className="text-[9px] font-mono text-white/30 tracking-wider">
+                  <span className="text-[11px] font-mono text-white/35">
                     {basicArticle.readTime}
                   </span>
                 </div>
                 <div>
-                  <h4 className="text-[14.5px] font-bold text-white/90 group-hover:text-[#e8a23a] transition-colors">
+                  <h4 className="text-[15.5px] font-semibold text-white/90 leading-snug">
                     {basicArticle.title}
                   </h4>
-                  <p className="text-[11px] leading-relaxed text-white/50 font-light mt-1">
+                  <p className="text-[12.5px] leading-relaxed text-white/55 mt-1.5">
                     {basicArticle.subtitle}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="w-5 h-5 rounded-full bg-[#e8a23a]/10 border border-[#e8a23a]/20 flex items-center justify-center font-mono font-bold text-[9px] text-[#e8a23a]">
+                <div className="flex items-center gap-2.5 mt-1">
+                  <div className="w-6 h-6 rounded-full bg-white/8 border border-white/12 flex items-center justify-center text-[10px] font-medium text-white/70">
                     {basicArticle.author[0]}
                   </div>
-                  <span className="text-[10px] text-white/40">{basicArticle.author}</span>
-                  <span className="text-white/20 font-light text-[9px] ml-auto group-hover:translate-x-1 transition-transform">
-                    Start Basics &rarr;
+                  <span className="text-[12px] text-white/50">{basicArticle.author}</span>
+                  <span className="text-[12px] text-white/35 ml-auto group-hover:text-white/70 group-hover:translate-x-0.5 transition-all duration-200">
+                    Read &rarr;
                   </span>
                 </div>
-              </div>
+              </button>
             ) : null}
 
-            {/* Card 2: Advanced Track Deep-Dive */}
+            {/* Step 2 — advanced track */}
             {advancedArticle ? (
-              <div
+              <button
                 onClick={() => onReadArticle(advancedArticle.id)}
-                className="cyber-card p-5 cursor-pointer flex flex-col gap-3 shadow-md hover:shadow-lg"
+                className="group rounded-xl border border-white/8 bg-[#0e1118] hover:border-white/20 hover:bg-[#11141d] p-5 cursor-pointer flex flex-col gap-3 text-left transition-colors duration-200"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[8px] font-mono font-bold tracking-[0.25em] text-amber-300/80 uppercase bg-amber-400/5 border border-amber-400/10 px-2 py-0.5 rounded-sm">
-                    Step 2 — Track {comp.advancedTrackNo}: {comp.advancedTrackName}
+                  <span className="text-[11px] font-medium text-white/55">
+                    Step 2 · {comp.advancedTrackName}
                   </span>
-                  <span className="text-[9px] font-mono text-white/30 tracking-wider">
+                  <span className="text-[11px] font-mono text-white/35">
                     {advancedArticle.readTime}
                   </span>
                 </div>
                 <div>
-                  <h4 className="text-[14.5px] font-bold text-white/90 group-hover:text-[#e8a23a] transition-colors">
+                  <h4 className="text-[15.5px] font-semibold text-white/90 leading-snug">
                     {advancedArticle.title}
                   </h4>
-                  <p className="text-[11px] leading-relaxed text-white/50 font-light mt-1">
+                  <p className="text-[12.5px] leading-relaxed text-white/55 mt-1.5">
                     {advancedArticle.subtitle}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="w-5 h-5 rounded-full bg-[#e8a23a]/10 border border-[#e8a23a]/20 flex items-center justify-center font-mono font-bold text-[9px] text-[#e8a23a]">
+                <div className="flex items-center gap-2.5 mt-1">
+                  <div className="w-6 h-6 rounded-full bg-white/8 border border-white/12 flex items-center justify-center text-[10px] font-medium text-white/70">
                     {advancedArticle.author[0]}
                   </div>
-                  <span className="text-[10px] text-white/40">{advancedArticle.author}</span>
-                  <span className="text-white/20 font-light text-[9px] ml-auto group-hover:translate-x-1 transition-transform">
-                    Read Deep Dive &rarr;
+                  <span className="text-[12px] text-white/50">{advancedArticle.author}</span>
+                  <span className="text-[12px] text-white/35 ml-auto group-hover:text-white/70 group-hover:translate-x-0.5 transition-all duration-200">
+                    Read &rarr;
                   </span>
                 </div>
-              </div>
+              </button>
             ) : (
-              <div className="cyber-card p-5 text-center flex flex-col items-center justify-center gap-1.5 h-[120px] select-none opacity-40">
-                <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-[#e8a23a]/60 uppercase">
-                  Track {comp.advancedTrackNo} — {comp.advancedTrackName}
+              <div className="rounded-xl border border-dashed border-white/12 p-5 text-center flex flex-col items-center justify-center gap-1.5 h-[120px] select-none">
+                <span className="text-[11px] font-medium text-white/45">
+                  Step 2 · {comp.advancedTrackName}
                 </span>
-                <span className="text-xs font-bold text-white/60">Advanced Analysis In Fabrication</span>
-                <span className="text-[9px] text-white/35 font-light">Weekly updates in the publication newsletter.</span>
+                <span className="text-[13px] font-medium text-white/65">In progress</span>
+                <span className="text-[11.5px] text-white/40">This deep dive is being written — subscribe for updates.</span>
               </div>
             )}
-
           </div>
-
         </div>
-
       </div>
     </div>
   );

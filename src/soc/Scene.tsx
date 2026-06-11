@@ -18,7 +18,8 @@ import {
   PackageSubstrate,
 } from "./ProceduralModels";
 
-const AMBER = "#e8a23a";
+// Physical copper-gold tone for metal interconnect (vias, buses, scribe rails).
+const AMBER = "#c79a4e";
 
 function getUtil(id: string, mode: SocMode): number {
   const table = UTILIZATION[id];
@@ -153,8 +154,8 @@ function DieInterconnects({ opacity }: { opacity: number }) {
 }
 
 const _pinMat = new THREE.MeshStandardMaterial({
-  color: "#e8a23a", // Amber/Gold
-  emissive: "#e8a23a",
+  color: "#c79a4e", // copper-gold
+  emissive: "#c79a4e",
   emissiveIntensity: 0.8,
   metalness: 0.9,
   roughness: 0.15,
@@ -735,7 +736,7 @@ export function Scene({
           mipmapBlur={!isMobile}
         />
         <Vignette eskil={false} offset={0.18} darkness={0.65} />
-        {!isMobile && <SMAA />}
+        {isMobile ? <></> : <SMAA />}
       </EffectComposer>
     </>
   );

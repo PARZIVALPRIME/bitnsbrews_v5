@@ -2,27 +2,28 @@ import { Suspense, useState, useMemo, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Scene as PlaygroundScene } from "./PlaygroundScene";
-import { BLOCKS, SocMode, UTILIZATION } from "./data";
+import { BLOCKS, DOMAIN_ACCENTS, SocMode, UTILIZATION, accentFor } from "./data";
 import { QualityContext } from "./quality";
 
-const MODES: { id: SocMode; icon: string; label: string }[] = [
-  { id: "Idle",   icon: "∿", label: "Idle" },
-  { id: "Gaming", icon: "❖", label: "Gaming" },
-  { id: "AI",     icon: "✧", label: "AI" },
-  { id: "Camera", icon: "◎", label: "Camera" },
-  { id: "Web",    icon: "⊕", label: "Web" },
-  { id: "Video",  icon: "▣", label: "Video" },
+const MODES: { id: SocMode; label: string }[] = [
+  { id: "Idle",   label: "Idle" },
+  { id: "Gaming", label: "Gaming" },
+  { id: "AI",     label: "AI" },
+  { id: "Camera", label: "Camera" },
+  { id: "Web",    label: "Web" },
+  { id: "Video",  label: "Video" },
 ];
 
+// Legend swatches use the same domain accents the blocks glow with.
 const LEGEND = [
-  { label: "Compute (CPU)", color: "#12284a" },
-  { label: "Graphics (GPU)", color: "#180830" },
-  { label: "AI Engine (NPU)", color: "#300810" },
-  { label: "Modem / RF", color: "#281808" },
-  { label: "Media & DSP", color: "#0a2018" },
-  { label: "Cache / Memory", color: "#0c1a28" },
-  { label: "PMU / I/O", color: "#0e0e08" },
-  { label: "LPDDR5x", color: "#060c18" },
+  { label: "Compute (CPU)", color: DOMAIN_ACCENTS.cpuBig },
+  { label: "Graphics (GPU)", color: DOMAIN_ACCENTS.gpu },
+  { label: "AI Engine (NPU)", color: DOMAIN_ACCENTS.npu },
+  { label: "Modem / RF", color: DOMAIN_ACCENTS.modem },
+  { label: "Media & DSP", color: DOMAIN_ACCENTS.isp },
+  { label: "Cache / Memory", color: DOMAIN_ACCENTS.slc },
+  { label: "PMU / I/O", color: DOMAIN_ACCENTS.pmu },
+  { label: "LPDDR5x", color: DOMAIN_ACCENTS.lpddr },
 ];
 
 function CameraController({ cameraRef }: { cameraRef: React.MutableRefObject<THREE.Camera | null> }) {
@@ -74,7 +75,7 @@ export function PlaygroundOverlay({
 
   return (
     <div
-      className={`fixed inset-0 z-50 overflow-hidden bg-[#08090e] font-sans text-white select-none transition-all duration-500 ease-in-out ${
+      className={`fixed inset-0 z-50 overflow-hidden bg-[#0b0d12] font-sans text-white select-none transition-all duration-500 ease-in-out ${
         mounted ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
       }`}
     >
@@ -83,7 +84,7 @@ export function PlaygroundOverlay({
         className="pointer-events-none absolute inset-0 z-1"
         style={{
           background:
-            "radial-gradient(900px 600px at 10% 8%, rgba(232,162,58,0.04), transparent 55%), radial-gradient(700px 500px at 92% 88%, rgba(100,140,220,0.04), transparent 55%)",
+            "radial-gradient(900px 600px at 10% 8%, rgba(91,124,250,0.05), transparent 55%), radial-gradient(700px 500px at 92% 88%, rgba(100,140,220,0.04), transparent 55%)",
         }}
       />
 
@@ -108,56 +109,52 @@ export function PlaygroundOverlay({
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-400/10 ring-1 ring-amber-400/25">
-            <span className="text-[11px] text-amber-300 font-bold">◉</span>
-          </div>
           <div>
-            <div className="text-[9px] font-semibold uppercase tracking-[0.25em] text-amber-200/60">
-              Silicon Architecture
+            <div className="text-[11px] font-medium text-white/45 leading-tight">
+              Interactive die
             </div>
-            <div className="text-[13px] font-semibold tracking-tight text-white/90 leading-tight">
+            <div className="text-[14px] font-semibold tracking-tight text-white/90 leading-tight">
               3nm Mobile SoC
             </div>
           </div>
         </div>
 
         {/* Mode switcher */}
-        <div className="flex items-center gap-0.5 rounded-full border border-white/8 bg-black/40 p-0.5 backdrop-blur-xl">
+        <div className="flex items-center gap-0.5 rounded-lg border border-white/10 bg-[#12151d] p-0.5">
           {MODES.map((m) => (
             <button
               key={m.id}
               onClick={() => setMode(m.id)}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold tracking-wide transition-all cursor-pointer ${
+              className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
                 mode === m.id
-                  ? "bg-amber-400/85 text-black shadow-md shadow-amber-500/20"
-                  : "text-white/45 hover:text-white/75 hover:bg-white/[0.04]"
+                  ? "bg-[#5b7cfa] text-white"
+                  : "text-white/50 hover:text-white/80 hover:bg-white/[0.05]"
               }`}
             >
-              <span className="text-[11px] leading-none">{m.icon}</span>
               {m.label}
             </button>
           ))}
         </div>
 
         {/* View toggle and Close button */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-0.5 rounded-full border border-white/8 bg-black/40 p-0.5 backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-0.5 rounded-lg border border-white/10 bg-[#12151d] p-0.5">
             <button
               onClick={() => setT(0)}
-              className={`rounded-full px-3 py-1 text-[10px] font-semibold transition cursor-pointer ${
+              className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
                 t === 0
-                  ? "bg-white/90 text-black shadow"
-                  : "text-white/45 hover:text-white/75"
+                  ? "bg-white/90 text-[#0b0d12]"
+                  : "text-white/50 hover:text-white/80"
               }`}
             >
               Assembled
             </button>
             <button
               onClick={() => setT(1)}
-              className={`rounded-full px-3 py-1 text-[10px] font-semibold transition cursor-pointer ${
+              className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
                 t === 1
-                  ? "bg-white/90 text-black shadow"
-                  : "text-white/45 hover:text-white/75"
+                  ? "bg-white/90 text-[#0b0d12]"
+                  : "text-white/50 hover:text-white/80"
               }`}
             >
               Exploded
@@ -166,16 +163,17 @@ export function PlaygroundOverlay({
 
           <button
             onClick={handleClose}
-            className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-950/20 px-4 py-1.5 text-[10px] font-mono font-bold tracking-widest text-red-400 hover:text-red-200 hover:bg-red-500/20 hover:border-red-500/50 transition cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:shadow-[0_0_20px_rgba(239,68,68,0.25)]"
+            className="flex items-center gap-2 rounded-lg border border-white/12 bg-[#12151d] px-4 py-2 text-[11px] font-medium text-white/60 hover:text-white/95 hover:border-white/25 transition-colors cursor-pointer"
           >
-            ✕ CLOSE PLAYGROUND
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            Close
           </button>
         </div>
       </div>
 
       {/* ───── Left: legend ───── */}
-      <div className="absolute left-5 top-24 z-10 w-44 rounded-xl border border-white/6 bg-black/30 p-3.5 backdrop-blur-xl">
-        <div className="mb-2.5 text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">
+      <div className="absolute left-5 top-24 z-10 w-44 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]">
+        <div className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white/40">
           Domains
         </div>
         <div className="space-y-1.5">
@@ -183,9 +181,9 @@ export function PlaygroundOverlay({
             <div key={l.label} className="flex items-center gap-2">
               <div
                 className="h-2 w-2 rounded-sm"
-                style={{ backgroundColor: l.color, boxShadow: `0 0 4px ${l.color}80` }}
+                style={{ backgroundColor: l.color }}
               />
-              <span className="text-[10px] text-white/55">{l.label}</span>
+              <span className="text-[11px] text-white/60">{l.label}</span>
             </div>
           ))}
         </div>
@@ -193,57 +191,57 @@ export function PlaygroundOverlay({
 
       {/* ───── Right: diagnostics panel (only when a block is selected) ───── */}
       {sel && (
-        <div className="absolute right-5 top-24 z-10 w-72 rounded-2xl border border-amber-300/15 bg-black/50 shadow-2xl backdrop-blur-2xl overflow-hidden">
+        <div className="absolute right-5 top-24 z-10 w-72 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] shadow-[0_2px_6px_rgba(0,0,0,0.4),0_12px_32px_rgba(0,0,0,0.35)] overflow-hidden">
           {/* header */}
-          <div className="border-b border-white/6 p-4 pb-3">
+          <div className="border-b border-white/8 p-4 pb-3">
             <div className="flex items-start justify-between">
-              <div className="text-[8px] font-semibold uppercase tracking-[0.22em] text-amber-200/60">
+              <div className="text-[10px] font-medium uppercase tracking-[0.1em]" style={{ color: accentFor(sel) }}>
                 Component
               </div>
               <button
                 onClick={() => setSelected(null)}
-                className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5 text-[10px] text-white/40 hover:bg-white/10 hover:text-white/80 transition cursor-pointer"
+                aria-label="Deselect component"
+                className="flex h-5 w-5 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/80 transition-colors cursor-pointer"
               >
-                ✕
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
             <h2 className="mt-1 text-[15px] font-semibold text-white/95 leading-tight">{sel.name}</h2>
-            <p className="mt-0.5 text-[9px] text-white/35">{sel.fn}</p>
+            <p className="mt-0.5 text-[11px] text-white/40">{sel.fn}</p>
           </div>
 
           {/* utilization bar */}
-          <div className="px-4 py-3 border-b border-white/6">
-            <div className="flex items-center justify-between text-[9px]">
-              <span className="text-white/40 uppercase tracking-wider font-semibold">
+          <div className="px-4 py-3 border-b border-white/8">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-white/45 font-medium">
                 {mode} utilization
               </span>
-              <span className="font-mono text-amber-200/80">{Math.round(selUtil * 100)}%</span>
+              <span className="font-mono text-white/80">{Math.round(selUtil * 100)}%</span>
             </div>
-            <div className="mt-1.5 h-1 w-full rounded-full bg-white/6 overflow-hidden">
+            <div className="mt-1.5 h-1 w-full rounded-full bg-white/8 overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-700"
                 style={{
                   width: `${selUtil * 100}%`,
-                  background: `linear-gradient(90deg, #e8a23a, ${selUtil > 0.7 ? "#ff8040" : "#e8a23a"})`,
-                  boxShadow: `0 0 8px rgba(232,162,58,${selUtil * 0.6})`,
+                  background: accentFor(sel),
                 }}
               />
             </div>
           </div>
 
           {/* description */}
-          <div className="px-4 py-3 border-b border-white/6">
-            <p className="text-[10px] leading-[1.65] text-white/55">{sel.description}</p>
+          <div className="px-4 py-3 border-b border-white/8">
+            <p className="text-[11.5px] leading-[1.65] text-white/60">{sel.description}</p>
           </div>
 
           {/* specs grid */}
-          <div className="grid grid-cols-3 gap-px bg-white/4">
+          <div className="grid grid-cols-3 gap-px bg-white/6">
             {sel.specs.map((s) => (
-              <div key={s.label} className="bg-black/40 px-3 py-2.5">
-                <div className="text-[7px] font-semibold uppercase tracking-wider text-white/30">
+              <div key={s.label} className="bg-[#0e1118] px-3 py-2.5">
+                <div className="text-[9px] font-medium uppercase tracking-wide text-white/35">
                   {s.label}
                 </div>
-                <div className="mt-0.5 text-[11px] font-semibold text-white/85">{s.value}</div>
+                <div className="mt-0.5 text-[11.5px] font-mono text-white/85">{s.value}</div>
               </div>
             ))}
           </div>
@@ -251,12 +249,12 @@ export function PlaygroundOverlay({
       )}
 
       {/* ───── Bottom-left: explode slider ───── */}
-      <div className="absolute bottom-5 left-5 z-10 w-56 rounded-xl border border-white/6 bg-black/30 p-3.5 backdrop-blur-xl">
+      <div className="absolute bottom-5 left-5 z-10 w-56 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">
+          <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-white/40">
             Explode
           </span>
-          <span className="font-mono text-[9px] text-amber-200/60">{Math.round(t * 100)}%</span>
+          <span className="font-mono text-[10px] text-white/60">{Math.round(t * 100)}%</span>
         </div>
         <input
           type="range"
@@ -269,14 +267,14 @@ export function PlaygroundOverlay({
         {/* Architecture Labels Toggle */}
         <button
           onClick={() => setShowLabels((s) => !s)}
-          className="mt-2.5 flex w-full items-center justify-between rounded-md border border-white/6 bg-black/20 px-2.5 py-1.5 transition hover:border-amber-300/20 hover:bg-white/[0.03] cursor-pointer"
+          className="mt-2.5 flex w-full items-center justify-between rounded-md border border-white/8 bg-white/[0.03] px-2.5 py-1.5 transition-colors hover:border-white/20 cursor-pointer"
         >
-          <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-white/50">
-            Architecture Labels
+          <span className="text-[10px] font-medium text-white/55">
+            Architecture labels
           </span>
           <span
             className="relative inline-block h-3.5 w-6 rounded-full transition"
-            style={{ backgroundColor: showLabels ? "rgba(232,162,58,0.6)" : "rgba(255,255,255,0.12)" }}
+            style={{ backgroundColor: showLabels ? "#5b7cfa" : "rgba(255,255,255,0.12)" }}
           >
             <span
               className="absolute top-px left-0.5 inline-block h-2.5 w-2.5 rounded-full bg-white shadow transition"
@@ -287,12 +285,12 @@ export function PlaygroundOverlay({
         <div className="mt-2 flex items-center justify-between">
           <button
             onClick={() => { if (cameraRef.current) { cameraRef.current.position.set(20, 16, 22); cameraRef.current.updateMatrixWorld(true); }}}
-            className="text-[8px] text-white/30 hover:text-white/50 transition cursor-pointer"
+            className="text-[10px] text-white/40 hover:text-white/70 transition-colors cursor-pointer"
           >
-            reset view
+            Reset view
           </button>
-          <span className="text-[8px] text-white/15">
-            scroll to zoom
+          <span className="text-[10px] text-white/25">
+            Scroll to zoom
           </span>
         </div>
       </div>
@@ -301,19 +299,22 @@ export function PlaygroundOverlay({
       <div className="absolute right-5 bottom-5 z-10 flex flex-col gap-1.5">
         <button
           onClick={() => zoom(0.82)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/8 bg-black/40 backdrop-blur-xl text-white/50 text-xs hover:text-amber-200 hover:border-amber-300/30 transition cursor-pointer"
+          aria-label="Zoom in"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[rgba(15,18,26,0.94)] text-white/55 text-sm hover:text-white/90 hover:border-white/25 transition-colors cursor-pointer"
         >
           +
         </button>
         <button
           onClick={() => { if (cameraRef.current) { cameraRef.current.position.set(20, 16, 22); cameraRef.current.updateMatrixWorld(true); }}}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/8 bg-black/40 backdrop-blur-xl text-white/50 text-[9px] hover:text-amber-200 hover:border-amber-300/30 transition cursor-pointer"
+          aria-label="Reset zoom"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[rgba(15,18,26,0.94)] text-white/55 hover:text-white/90 hover:border-white/25 transition-colors cursor-pointer"
         >
-          ◎
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" /></svg>
         </button>
         <button
           onClick={() => zoom(1.2)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/8 bg-black/40 backdrop-blur-xl text-white/50 text-xs hover:text-amber-200 hover:border-amber-300/30 transition cursor-pointer"
+          aria-label="Zoom out"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[rgba(15,18,26,0.94)] text-white/55 text-sm hover:text-white/90 hover:border-white/25 transition-colors cursor-pointer"
         >
           −
         </button>
@@ -321,8 +322,8 @@ export function PlaygroundOverlay({
 
       {/* ───── Bottom credit ───── */}
       <div className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 z-10">
-        <span className="font-mono text-[8px] tracking-[0.15em] text-white/15">
-          22×18u die · 3nm EUV FinFET · ~12B transistors
+        <span className="font-mono text-[10px] text-white/25">
+          22×18u die · 3nm EUV · ~12B transistors
         </span>
       </div>
     </div>

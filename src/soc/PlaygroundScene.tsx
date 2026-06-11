@@ -27,7 +27,7 @@ function Die() {
         <boxGeometry args={[dieW, 0.6, dieD]} />
         <meshStandardMaterial color="#080c10" metalness={0.35} roughness={0.75} />
         <Edges threshold={15} scale={1.001}>
-          <lineBasicMaterial color="#e8a23a" transparent opacity={0.35} />
+          <lineBasicMaterial color="#c79a4e" transparent opacity={0.35} />
         </Edges>
       </mesh>
 
@@ -47,8 +47,8 @@ function Die() {
         <mesh key={i} position={[x, y, z]}>
           <boxGeometry args={[w, h, d]} />
           <meshStandardMaterial
-            color="#e8a23a"
-            emissive="#e8a23a"
+            color="#c79a4e"
+            emissive="#c79a4e"
             emissiveIntensity={0.55}
             metalness={1}
             roughness={0.15}
@@ -119,7 +119,7 @@ function Lights() {
       <directionalLight position={[12, 4, -8]} intensity={0.35} color="#0a1530" />
 
       {/* Light 3: Amber rim (dramatic edge catch from behind) */}
-      <directionalLight position={[-5, 3, -18]} intensity={0.4} color="#e8a23a" />
+      <directionalLight position={[-5, 3, -18]} intensity={0.4} color="#c79a4e" />
 
       {/* subtle overhead downwash for readability */}
       <directionalLight position={[0, 18, 0]} intensity={0.2} color="#d8d0c8" />

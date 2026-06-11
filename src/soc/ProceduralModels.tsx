@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { Edges } from "@react-three/drei";
 import { TransistorFlowShader } from "./shaders";
 
-const AMBER = "#e8a23a";
+const AMBER = "#c79a4e";
 const STEEL = "#5e6977";
 
 function metalMat(color: string, roughness = 0.3, metalness = 0.9) {

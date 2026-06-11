@@ -5,7 +5,7 @@ import { Edges } from "@react-three/drei";
 import type { Block } from "./data";
 import { useQuality } from "./quality";
 
-const AMBER = "#e8a23a";
+const AMBER = "#c79a4e";
 
 function metal(color: string, roughness = 0.34, metalness = 0.96) {
   return { color, roughness, metalness } as const;

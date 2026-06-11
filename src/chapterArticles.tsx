@@ -82,37 +82,37 @@ export function parseMarkdown(text: string) {
   return text.split("\n").map((line, idx) => {
     if (line.startsWith("# ")) {
       return (
-        <h1 key={idx} className="text-[12px] font-bold text-[#e8a23a] mt-2 mb-0.5 tracking-wide uppercase">
+        <h1 key={idx} className="text-[13px] font-semibold text-white/95 mt-2 mb-1">
           {line.slice(2)}
         </h1>
       );
     }
     if (line.startsWith("## ")) {
       return (
-        <h2 key={idx} className="text-[10.5px] font-semibold text-white/95 mt-1.5 mb-0.5 border-b border-white/5 pb-0.5">
+        <h2 key={idx} className="text-[11.5px] font-medium text-[#8aa9ff] mt-1.5 mb-1">
           {line.slice(3)}
         </h2>
       );
     }
     if (line.startsWith("### ")) {
       return (
-        <h3 key={idx} className="text-[9.5px] font-medium text-[#e8a23a]/80 mt-1 mb-0.5">
+        <h3 key={idx} className="text-[11px] font-medium text-white/75 mt-1.5 mb-0.5">
           {line.slice(4)}
         </h3>
       );
     }
     if (line.startsWith("- ")) {
       return (
-        <li key={idx} className="text-[8.5px] text-white/60 ml-3.5 list-disc my-0.5">
+        <li key={idx} className="text-[11px] leading-[1.6] text-white/60 ml-3.5 list-disc my-0.5">
           {line.slice(2)}
         </li>
       );
     }
     if (line.trim() === "") {
-      return <div key={idx} className="h-1" />;
+      return <div key={idx} className="h-1.5" />;
     }
     return (
-      <p key={idx} className="text-[9px] leading-[1.55] text-white/50 my-0.5 font-light font-sans text-left">
+      <p key={idx} className="text-[11.5px] leading-[1.65] text-white/60 my-1 text-left">
         {line}
       </p>
     );
