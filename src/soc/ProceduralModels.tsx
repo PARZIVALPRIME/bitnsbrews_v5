@@ -133,7 +133,13 @@ export function MotherboardPCB({ active }: { active: boolean }) {
 /* =========================================================================
    3. BGA PACKAGE SUBSTRATE (Level 3)
    ========================================================================= */
-export function PackageSubstrate({ opacity = 1 }: { opacity?: number }) {
+export function PackageSubstrate({
+  opacity = 1,
+  showFineDetail = true,
+}: {
+  opacity?: number;
+  showFineDetail?: boolean;
+}) {
   const step = 1.4;
   const w = 26;
   const d = 22;
@@ -253,10 +259,14 @@ export function PackageSubstrate({ opacity = 1 }: { opacity?: number }) {
       })}
 
       {/* Realistic 3D SMD Capacitors — instanced: 2 draw calls instead of 36 */}
-      <InstancedCapacitors capacitors={capacitors} opacity={opacity} />
+      {showFineDetail && (
+        <>
+          <InstancedCapacitors capacitors={capacitors} opacity={opacity} />
 
       {/* Golden Solder Micro-Balls grid — instanced: 1 draw call instead of ~200 */}
-      <InstancedSolderBalls positions={ballData} opacity={opacity} />
+          <InstancedSolderBalls positions={ballData} opacity={opacity} />
+        </>
+      )}
     </group>
   );
 }

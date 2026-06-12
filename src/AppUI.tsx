@@ -258,6 +258,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
   const currentChapter = CHAPTERS.find((c) => c.level === targetLevel) ?? CHAPTERS[CHAPTERS.length - 1];
   const SceneEl = SceneComp;
+  const suspendMainScene = readerArticleId !== null || showPlayground;
 
   // On the Library page the die is the table of contents: clicking a block
   // (or its floating track card) opens that track's article portal.
@@ -274,6 +275,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── 3D Canvas ─────────────────────────────────────────────────────── */}
       <div className="absolute inset-0 z-1">
+        {!suspendMainScene && (
         <Canvas
           shadows={perfMode === "high"}
           dpr={perfMode === "high" ? dynamicDpr : 1}
@@ -303,6 +305,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             </PerformanceMonitor>
           </QualityContext.Provider>
         </Canvas>
+        )}
       </div>
 
       {/* ── Vignette: two layers that cross-fade between ch1 and ch2+ ───── */}

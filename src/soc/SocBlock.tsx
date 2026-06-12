@@ -91,18 +91,21 @@ export function SocBlock({
     }
     const doMatUpdate = !isMobile || frameSkip.current === 0;
 
+    const hoverTarget = hovered && !dimmed ? 1 : 0;
+    const selectTarget = selected ? 1 : 0;
+
     cur.current += (t - cur.current) * (isMobile ? 0.16 : 0.12);
     utilCur.current += (modeUtilization - utilCur.current) * (isMobile ? 0.08 : 0.06);
-    hoverCur.current += ((hovered && !dimmed ? 1 : 0) - hoverCur.current) * 0.15;
-    selectCur.current += ((selected ? 1 : 0) - selectCur.current) * 0.14;
+    hoverCur.current += (hoverTarget - hoverCur.current) * 0.15;
+    selectCur.current += (selectTarget - selectCur.current) * 0.14;
 
     // Snap to targets once close enough. Without this the asymptotic lerp never
     // reaches t exactly, the settled early-return below never fires, and every
     // block keeps dirtying its matrix + materials every frame forever.
     if (Math.abs(t - cur.current) < 0.001) cur.current = t;
     if (Math.abs(modeUtilization - utilCur.current) < 0.001) utilCur.current = modeUtilization;
-    if (Math.abs((selected ? 1 : 0) - selectCur.current) < 0.001) selectCur.current = selected ? 1 : 0;
-    if (Math.abs((hovered ? 1 : 0) - hoverCur.current) < 0.001) hoverCur.current = hovered ? 1 : 0;
+    if (Math.abs(selectTarget - selectCur.current) < 0.001) selectCur.current = selectTarget;
+    if (Math.abs(hoverTarget - hoverCur.current) < 0.001) hoverCur.current = hoverTarget;
 
     const y = cur.current * liftMax * liftScale;
     const microLift = utilCur.current * 0.25;
@@ -112,8 +115,8 @@ export function SocBlock({
     const motion =
       Math.abs(t - cur.current) +
       Math.abs(modeUtilization - utilCur.current) +
-      Math.abs((selected ? 1 : 0) - selectCur.current) +
-      Math.abs((hovered ? 1 : 0) - hoverCur.current);
+      Math.abs(selectTarget - selectCur.current) +
+      Math.abs(hoverTarget - hoverCur.current);
     const wasSettled = settled.current;
     settled.current = motion < 0.005;
 
@@ -285,7 +288,7 @@ export function SocBlock({
         {/* micro-architecture surface detail (SRAM arrays, shader grids, bump fields).
             PlaygroundDetails degrades itself on mobile (skips edges + wells), so it
             stays on in potato mode — the silhouette is what sells the silicon. */}
-        {!dimmed && visMode !== "thermal" && <BlockDetail block={block} />}
+        {!dimmed && visMode !== "thermal" && level >= 3 && <BlockDetail block={block} />}
 
         {/* architecture label */}
         {visMode !== "thermal" && labelVisible && (

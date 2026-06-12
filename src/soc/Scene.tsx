@@ -354,10 +354,19 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
 /* =========================================================================
    DIE SUBSTRATE & BASE
    ========================================================================= */
-function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
+function Die({
+  visMode,
+  opacity = 1,
+  levelFloat,
+}: {
+  visMode: string;
+  opacity?: number;
+  levelFloat: number;
+}) {
   const dieW = DIE_W + 1.4;
   const dieD = DIE_D + 1.4;
   const rail = 0.14;
+  const showFineDetail = levelFloat > 1.65;
 
   const matRef = useRef<THREE.ShaderMaterial>(null!);
 
@@ -416,7 +425,7 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
               opacity={opacity}
             />
           </mesh>
-          <DieInterconnects opacity={opacity} />
+          {showFineDetail && <DieInterconnects opacity={opacity} />}
         </>
       )}
 
@@ -440,7 +449,7 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
         </mesh>
       ))}
       {/* Input Output pins at the edges of the die */}
-      <DieIOPins dieW={dieW} dieD={dieD} opacity={opacity} />
+      {showFineDetail && <DieIOPins dieW={dieW} dieD={dieD} opacity={opacity} />}
     </group>
   );
 }
@@ -677,8 +686,8 @@ export function Scene({
 
         {/* Layer 2: Semiconductor SoC (slides up & fades in) */}
         <group position={[0, chipY, 0]}>
-          <PackageSubstrate opacity={chipOpacity} />
-          <Die visMode={visMode} opacity={chipOpacity} />
+          <PackageSubstrate opacity={chipOpacity} showFineDetail={levelFloat > 1.35} />
+          <Die visMode={visMode} opacity={chipOpacity} levelFloat={levelFloat} />
           
           {(() => {
             // The Library (level 4) auto-raises every block in a center-out ripple
@@ -746,6 +755,7 @@ export function Scene({
       <EffectComposer multisampling={0}>
         <Bloom
           intensity={isMobile ? 0.35 : 0.55}
+          height={isMobile ? 160 : 240}
           luminanceThreshold={0.5}
           luminanceSmoothing={0.15}
           mipmapBlur={!isMobile}

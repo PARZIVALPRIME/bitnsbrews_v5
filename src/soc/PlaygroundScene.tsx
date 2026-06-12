@@ -1,8 +1,11 @@
+import { memo } from "react";
 import { OrbitControls, Environment, Lightformer, Edges, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing";
 import { BLOCKS, DIE_W, DIE_D, SocMode, UTILIZATION } from "./data";
 import { SocBlock } from "./PlaygroundBlock";
 import { TrafficNetwork } from "./Traffic";
+
+const MemoSocBlock = memo(SocBlock);
 
 function getUtil(id: string, mode: SocMode): number {
   const table = UTILIZATION[id];
@@ -159,7 +162,7 @@ export function Scene({
       <group onPointerMissed={() => setSelected(null)}>
         <Die />
         {BLOCKS.map((b) => (
-          <SocBlock
+          <MemoSocBlock
             key={b.id}
             block={b}
             t={t}
@@ -181,6 +184,7 @@ export function Scene({
         opacity={0.55}
         far={18}
         color="#000000"
+        frames={1}
       />
 
       <OrbitControls
@@ -195,7 +199,7 @@ export function Scene({
       />
 
       <EffectComposer multisampling={0}>
-        <Bloom intensity={0.55} luminanceThreshold={0.5} luminanceSmoothing={0.15} mipmapBlur />
+        <Bloom intensity={0.55} height={240} luminanceThreshold={0.5} luminanceSmoothing={0.15} mipmapBlur />
         <Vignette eskil={false} offset={0.18} darkness={0.65} />
         <SMAA />
       </EffectComposer>

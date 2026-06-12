@@ -1,6 +1,7 @@
 import { Suspense, useState, useMemo, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
+import { PerformanceMonitor } from "@react-three/drei";
 import { Scene as PlaygroundScene } from "./PlaygroundScene";
 import { BLOCKS, DOMAIN_ACCENTS, SocMode, UTILIZATION, accentFor } from "./data";
 import { QualityContext } from "./quality";
@@ -45,6 +46,7 @@ export function PlaygroundOverlay({
   const [mode, setMode] = useState<SocMode>("Idle");
   const cameraRef = useRef<THREE.Camera | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [dynamicDpr, setDynamicDpr] = useState(1.5);
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 25);
