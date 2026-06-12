@@ -137,7 +137,7 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
 
   return (
     <motion.div
-      className="fixed inset-0 z-[60] blueprint-grid"
+      className="fixed inset-0 z-[60] bg-[#0b0d12]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.35, ease: "easeOut" } }}
       exit={{ opacity: 0, transition: { duration: 0.25, ease: "easeIn" } }}

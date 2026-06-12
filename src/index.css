@@ -39,6 +39,7 @@ body,
   height: 100%;
   margin: 0;
   background-color: var(--bg);
+  color-scheme: dark;
 }
 
 body {
@@ -78,33 +79,6 @@ body {
   background: var(--surface-overlay);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-2);
-}
-
-/* Blueprint drafting grid — full-screen reading/modal surfaces only, never
-   layered over the live 3D die. Fine 24px line grid + coarse 120px majors. */
-.blueprint-grid {
-  background-color: var(--bg);
-  background-image:
-    linear-gradient(rgba(138, 169, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(138, 169, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(rgba(138, 169, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(138, 169, 255, 0.05) 1px, transparent 1px);
-  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
-}
-
-/* Hairline rule with a centered mono label — section dividers in the reader */
-.rule-label {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.rule-label::before,
-.rule-label::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--border);
 }
 
 /* minimal range slider */

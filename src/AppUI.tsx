@@ -145,7 +145,6 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       if (elapsed >= 2000) {
         const fps = (frameCount * 1000) / elapsed;
-        console.log("Dynamic FPS measured:", fps);
         if (fps < 45 && !checked) {
           setPerfMode("low");
           setAutoDowngraded(true);
@@ -911,7 +910,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         {!booted && (
           <motion.div
             key="boot"
-            className="fixed inset-0 z-[80] blueprint-grid flex flex-col items-center justify-center"
+            className="fixed inset-0 z-[80] bg-[#0b0d12] flex flex-col items-center justify-center"
             exit={{ opacity: 0, transition: { duration: 0.7, ease: "easeInOut" } }}
           >
             <motion.div

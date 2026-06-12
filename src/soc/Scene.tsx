@@ -250,7 +250,7 @@ function DieIOPins({ dieW, dieD, opacity }: { dieW: number; dieD: number; opacit
 
 function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
   const quality = useQuality();
-  const streamCount = quality === "mobile" ? 16 : 36;
+  const streamCount = quality === "mobile" ? 12 : 36;
   const streamVisible = levelFloat <= 1.8;
   const opacityMultiplier = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.55); // fades out quickly
 
@@ -463,7 +463,7 @@ function CameraController({
     [levelFloat, selectedBlockCoords]
   );
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const time = state.clock.getElapsedTime();
 
     // Subtle micro-breathing drift only
@@ -475,14 +475,17 @@ function CameraController({
       new THREE.Vector3(driftX, driftY, driftZ)
     );
 
-    // Smooth lerp
-    camera.position.lerp(finalPos, 0.06);
-    targetRef.current.lerp(targetParams.target, 0.06);
+    // Exponential damping scaled by delta — identical swoop feel at 30fps
+    // (potato) and 144fps instead of the fixed-step lerp that crawled on
+    // slow machines and snapped on fast ones.
+    const k = 1 - Math.exp(-4.2 * delta);
+    camera.position.lerp(finalPos, k);
+    targetRef.current.lerp(targetParams.target, k);
     camera.lookAt(targetRef.current);
 
     const persCam = camera as THREE.PerspectiveCamera;
     if (persCam.isPerspectiveCamera) {
-      persCam.fov += (targetParams.fov - persCam.fov) * 0.06;
+      persCam.fov += (targetParams.fov - persCam.fov) * k;
       persCam.updateProjectionMatrix();
     }
   });
@@ -508,10 +511,15 @@ function Lights({ visMode, levelFloat }: { visMode: string; levelFloat: number }
 
   return (
     <>
-      <ambientLight intensity={ambientIntensity} color="#0c0c0a" />
+      {/* Potato mode runs without shadows or SMAA, so it needs a brighter,
+          more neutral fill to keep the die readable instead of pitch black. */}
+      <ambientLight
+        intensity={isMobile ? ambientIntensity * 1.5 : ambientIntensity}
+        color={isMobile ? "#1c1e24" : "#0c0c0a"}
+      />
 
       {/* Cool sky / warm ground gradient — makes block faces read as 3D volumes */}
-      {!isThermal && <hemisphereLight args={["#2e3850", "#191007", 0.55]} />}
+      {!isThermal && <hemisphereLight args={["#2e3850", "#191007", isMobile ? 0.8 : 0.55]} />}
 
       {/* Chapter 1 Hero Spotlight — no shadow casting: the key light already
           casts, and a second shadow pass doubles the geometry cost. */}
@@ -597,12 +605,18 @@ export function Scene({
   useEffect(() => {
     let raf: number;
     const ease = () => {
+      let settled = false;
       setLevelFloat((prev) => {
         const diff = targetLevel - prev;
-        if (Math.abs(diff) < 0.02) return targetLevel; // snap & settle
+        if (Math.abs(diff) < 0.02) {
+          settled = true;
+          return targetLevel; // snap & settle
+        }
         return Math.round((prev + diff * 0.12) * 50) / 50;
       });
-      raf = requestAnimationFrame(ease);
+      // Stop the loop once settled — previously this rAF ran forever,
+      // burning CPU on every frame even when nothing was animating.
+      if (!settled) raf = requestAnimationFrame(ease);
     };
     raf = requestAnimationFrame(ease);
     return () => cancelAnimationFrame(raf);
@@ -637,19 +651,20 @@ export function Scene({
 
   return (
     <>
-      {/* Transparent canvas background allows HTML circuit traces to show behind the 3D casing */}
-      <fog attach="fog" args={["#08090e", fogStart, fogEnd]} />
+      {/* Fog matches the UI background token so the 3D horizon blends seamlessly */}
+      <fog attach="fog" args={["#0b0d12", fogStart, fogEnd]} />
 
       <Lights visMode={visMode} levelFloat={levelFloat} />
 
-      {!isMobile ? (
-        <Environment resolution={128}>
-          <Lightformer intensity={1.4} color="#ffdca8" position={[-10, 8, 6]} scale={[10, 10, 1]} />
-          <Lightformer intensity={0.6} color="#8aa0e0" position={[12, 6, -6]} scale={[8, 8, 1]} />
-          <Lightformer intensity={0.8} color="#ffb878" position={[0, 5, -14]} scale={[12, 4, 1]} />
-          <Lightformer intensity={0.35} color="#e0ddd8" position={[0, 14, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[22, 22, 1]} />
-        </Environment>
-      ) : null}
+      {/* Environment is essential in BOTH modes: the metallic block materials
+          have nothing to reflect without it and render near-black. Potato mode
+          gets a 64px bake (one-time PMREM cost, ~256KB VRAM) instead of none. */}
+      <Environment resolution={isMobile ? 64 : 128} frames={1}>
+        <Lightformer intensity={1.4} color="#ffdca8" position={[-10, 8, 6]} scale={[10, 10, 1]} />
+        <Lightformer intensity={0.6} color="#8aa0e0" position={[12, 6, -6]} scale={[8, 8, 1]} />
+        <Lightformer intensity={0.8} color="#ffb878" position={[0, 5, -14]} scale={[12, 4, 1]} />
+        <Lightformer intensity={0.35} color="#e0ddd8" position={[0, 14, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[22, 22, 1]} />
+      </Environment>
 
       <CameraController levelFloat={levelFloat} selectedBlockCoords={selectedBlockCoords} />
 
