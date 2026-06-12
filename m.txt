@@ -1,0 +1,5 @@
+@design_audit.md theese are some of the issues i found in my website the website feels more ai ish with the black
+  and orange coolours and also ther are lot of issues with it lets fix this and also u can change the desgin or
+  impprove over the 3d model make the 3d model better or make the navigatoin better i want it look profiessional and no
+  ai ish and also top tier fix everything /ui-ux-pro-max:ui-ux-pro-max make  the frfontend look so proessional this is
+  actaually for everyone to understand about chips and that also there are lot of optimization issues and also i think lets make it profiessional without making it look ai-ish  and also use py -3  for command bcoz my python installed is python use that command not python3 and Python 3.13.14 is isntalled on my pc

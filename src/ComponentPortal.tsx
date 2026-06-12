@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { getComponent, getArticle } from "./articles";
 import { DOMAIN_ACCENTS } from "./soc/data";
 
@@ -116,21 +117,9 @@ function SpecRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+// Escape handling lives in AppUI so stacked overlays close top-down.
 export function ComponentPortal({ componentId, onClose, onReadArticle }: ComponentPortalProps) {
-  const [entered, setEntered] = useState(false);
   const comp = getComponent(componentId);
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setEntered(true));
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
 
   if (!comp) return null;
 
@@ -139,15 +128,19 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
   const accent = ACCENTS[comp.id] ?? "#8aa9ff";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0d12]/85 backdrop-blur-sm transition-opacity duration-300 p-4 sm:p-8"
-      style={{ opacity: entered ? 1 : 0 }}
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#06070b]/90 p-4 sm:p-8"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, transition: { duration: 0.25, ease: "easeOut" } }}
+      exit={{ opacity: 0, transition: { duration: 0.2, ease: "easeIn" } }}
       onClick={onClose}
     >
       {/* Main panel */}
-      <div
-        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_2px_6px_rgba(0,0,0,0.4),0_24px_64px_rgba(0,0,0,0.5)] flex flex-col gap-8 scrollbar-thin transition-transform duration-400 ease-out"
-        style={{ transform: entered ? "scale(1) translateY(0)" : "scale(0.97) translateY(8px)" }}
+      <motion.div
+        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_2px_6px_rgba(0,0,0,0.4),0_24px_64px_rgba(0,0,0,0.5)] flex flex-col gap-8 scrollbar-thin"
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 280, damping: 28 } }}
+        exit={{ opacity: 0, scale: 0.97, y: 8, transition: { duration: 0.2, ease: "easeIn" } }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -291,7 +284,7 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

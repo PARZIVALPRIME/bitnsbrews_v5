@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import type { Article, ArticleSegment } from "./articles";
 
 // ── Tiny inline formatter: **bold**, *italic*, `code` ───────────────────────
@@ -35,11 +36,11 @@ function renderInline(text: string): ReactNode[] {
   return out;
 }
 
-function Segment({ seg }: { seg: ArticleSegment }) {
+function Segment({ seg, dropCap = false }: { seg: ArticleSegment; dropCap?: boolean }) {
   switch (seg.kind) {
     case "p":
       return (
-        <p className="article-serif text-[17px] leading-[1.85] text-white/70 mb-7">
+        <p className={`article-serif text-[17px] leading-[1.85] text-white/70 mb-7 ${dropCap ? "drop-cap" : ""}`}>
           {renderInline(seg.text)}
         </p>
       );
@@ -129,30 +130,17 @@ function Segment({ seg }: { seg: ArticleSegment }) {
   }
 }
 
+// Escape handling lives in AppUI so stacked overlays close top-down.
 export function ArticleReader({ article, onClose }: { article: Article; onClose: () => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
-  const [entered, setEntered] = useState(false);
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setEntered(true));
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-[60] bg-[#0b0d12]"
-      style={{
-        opacity: entered ? 1 : 0,
-        transition: "opacity 400ms ease",
-      }}
+    <motion.div
+      className="fixed inset-0 z-[60] blueprint-grid"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, transition: { duration: 0.35, ease: "easeOut" } }}
+      exit={{ opacity: 0, transition: { duration: 0.25, ease: "easeIn" } }}
     >
       {/* Reading progress */}
       <div className="absolute top-0 left-0 right-0 h-[2px] z-10 bg-white/[0.06]">
@@ -189,22 +177,27 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
           setProgress(max > 0 ? el.scrollTop / max : 0);
         }}
       >
-        <article
+        <motion.article
           className="max-w-[700px] mx-auto px-6 sm:px-8 pt-28 pb-32"
-          style={{
-            opacity: entered ? 1 : 0,
-            transform: entered ? "translateY(0)" : "translateY(20px)",
-            transition: "opacity 600ms ease 100ms, transform 600ms ease 100ms",
+          initial={{ opacity: 0, y: 24 }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            transition: { type: "spring", stiffness: 280, damping: 28, delay: 0.08 },
           }}
         >
           {/* Header */}
           <header className="mb-14">
             <div className="flex items-center gap-3 mb-7">
-              <span className="text-[11px] font-medium tracking-[0.08em] text-[#8aa9ff] uppercase">
+              <span className="h-px w-8 bg-[#8aa9ff]/60" aria-hidden />
+              <span className="font-mono text-[10.5px] tracking-[0.1em] text-[#8aa9ff] uppercase">
                 {article.track} · No. {article.trackNo}
               </span>
             </div>
-            <h1 className="article-serif text-[38px] sm:text-[46px] font-bold leading-[1.12] tracking-[-0.02em] text-white/95 mb-5">
+            <h1
+              className="article-serif font-bold leading-[1.12] tracking-[-0.02em] text-white/95 mb-5"
+              style={{ fontSize: "clamp(36px, 4.5vw, 50px)" }}
+            >
               {article.title}
             </h1>
             <p className="article-serif italic text-[19px] leading-[1.5] text-white/50 mb-8">
@@ -216,17 +209,20 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-[12.5px] font-medium text-white/85">{article.author}</span>
-                <span className="text-[11.5px] text-white/40">
+                <span className="font-mono text-[10.5px] tracking-[0.06em] uppercase text-white/40">
                   {article.date} · {article.readTime}
                 </span>
               </div>
             </div>
           </header>
 
-          {/* Body */}
-          {article.segments.map((seg, i) => (
-            <Segment key={i} seg={seg} />
-          ))}
+          {/* Body — opening paragraph gets the editorial drop cap */}
+          {(() => {
+            const firstP = article.segments.findIndex((s) => s.kind === "p");
+            return article.segments.map((seg, i) => (
+              <Segment key={i} seg={seg} dropCap={i === firstP} />
+            ));
+          })()}
 
           {/* End mark + footer */}
           <footer className="mt-16">
@@ -251,8 +247,8 @@ export function ArticleReader({ article, onClose }: { article: Article; onClose:
               </button>
             </div>
           </footer>
-        </article>
+        </motion.article>
       </div>
-    </div>
+    </motion.div>
   );
 }

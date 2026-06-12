@@ -29,6 +29,10 @@
 
 @import "tailwindcss";
 
+html {
+  color-scheme: dark;
+}
+
 html,
 body,
 #root {
@@ -41,6 +45,21 @@ body {
   font-family: 'Inter', -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   color: var(--text-primary);
+}
+
+::selection {
+  background: rgba(91, 124, 250, 0.35);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Counters, chapter numbers, spec values — digits keep a fixed width */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 .font-mono {
@@ -59,6 +78,33 @@ body {
   background: var(--surface-overlay);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-2);
+}
+
+/* Blueprint drafting grid — full-screen reading/modal surfaces only, never
+   layered over the live 3D die. Fine 24px line grid + coarse 120px majors. */
+.blueprint-grid {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(138, 169, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(138, 169, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(rgba(138, 169, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(138, 169, 255, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+}
+
+/* Hairline rule with a centered mono label — section dividers in the reader */
+.rule-label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rule-label::before,
+.rule-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
 }
 
 /* minimal range slider */
@@ -137,12 +183,14 @@ body {
   animation: fadeInUp 0.4s ease forwards;
 }
 
-/* Floating track cards on the Library page (3D-anchored HTML) */
-.track-card {
-  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
-  background: transparent;
-  border: none;
-  padding: 0;
+/* Drop cap — opening paragraph of the article reader */
+.drop-cap::first-letter {
+  float: left;
+  font-size: 3.1em;
+  line-height: 0.82;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0.04em 0.13em 0 0;
 }
 
 /* Boot screen progress line */
