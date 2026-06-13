@@ -8,6 +8,11 @@ import { TRACKS, getTrackArticle } from "./trackArticles";
 import { getArticle } from "./articles";
 import { ArticleReader } from "./ArticleReader";
 import { ComponentPortal } from "./ComponentPortal";
+import { TrackPage } from "./TrackPage";
+import { Footer } from "./components/Footer";
+import { SearchPalette } from "./components/SearchPalette";
+import { BLOCKS } from "./soc/data";
+import { ARTICLE_BLOCK_IDS } from "./articles";
 
 import { PlaygroundOverlay } from "./soc/PlaygroundOverlay";
 
@@ -41,20 +46,25 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   const [subscribed, setSubscribed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [hubAtBottom, setHubAtBottom] = useState(false);
+  const [activeTrackPageId, setActiveTrackPageId] = useState<string | null>(null);
 
   // ── Article gallery (Page 4) state ────────────────────────────────────────
   const [readerArticleId, setReaderArticleId] = useState<string | null>(null);
   const [activeComponentPortal, setActiveComponentPortal] = useState<string | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
   const readerOpenRef = useRef(false);
   useEffect(() => {
-    readerOpenRef.current = readerArticleId !== null || activeComponentPortal !== null;
-  }, [readerArticleId, activeComponentPortal]);
+    readerOpenRef.current =
+      readerArticleId !== null || activeComponentPortal !== null || activeTrackPageId !== null || isSearchOpen;
+  }, [readerArticleId, activeComponentPortal, activeTrackPageId, isSearchOpen]);
 
   const [showPlayground, setShowPlayground] = useState(false);
 
   // Performance scaling settings
   const [perfMode, setPerfMode] = useState<"high" | "low">("high");
   const [autoDowngraded, setAutoDowngraded] = useState(false);
+  const [showPerfPrompt, setShowPerfPrompt] = useState(false);
 
   // Branded boot screen — covers shader compilation / first-frame jank.
   const [booted, setBooted] = useState(false);
@@ -62,6 +72,14 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     const id = setTimeout(() => setBooted(true), 1400);
     return () => clearTimeout(id);
   }, []);
+
+  // Auto-dismiss performance prompt after 8 seconds
+  useEffect(() => {
+    if (showPerfPrompt) {
+      const timer = setTimeout(() => setShowPerfPrompt(false), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [showPerfPrompt]);
 
   // Dynamic resolution: high mode starts at 1.5× and self-tunes against the
   // measured frame rate, so strong GPUs stay crisp and weaker ones stay smooth.
@@ -159,19 +177,40 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       if (readerOpenRef.current) return;
 
       const currentLvl = targetLevelRef.current;
+      const target = e.target as HTMLElement | null;
 
+      // Find if we are scrolling inside any scrollable overlay container
+      const scrollContainer = target ? target.closest(".overflow-y-auto, .overflow-y-scroll, .scrollbar-thin, input[type='range']") as HTMLElement | null : null;
+
+      if (scrollContainer) {
+        // Special case: on the Hub (level 5), we let the user scroll back up to level 4 once they reach the top of the catalog
+        if (currentLvl === 5 && scrollContainer.id === "hub-catalog-container") {
+          const isAtTop = scrollContainer.scrollTop <= 0;
+          const isScrollingUp = e.deltaY < 0;
+
+          if (isAtTop && isScrollingUp) {
+            // Do not return, let it proceed to chapter transition logic
+            e.preventDefault();
+          } else {
+            // Let the catalog container scroll naturally
+            return;
+          }
+        } else {
+          // For any other scrollable containers (Chapter 3 sidebar, details panel, etc.),
+          // completely ignore chapter navigation and let them scroll natively
+          return;
+        }
+      }
+
+      // If we are not inside a scroll container, or we passed the Hub top-scroll check:
       if (currentLvl === 5) {
-        // On the final Hub page, let the catalog container handle scrolling
-        // unless we are at the top and the user is scrolling UP, in which case we go back.
         const container = document.getElementById("hub-catalog-container");
         if (container) {
           const isAtTop = container.scrollTop <= 0;
           const isScrollingUp = e.deltaY < 0;
-
           if (isAtTop && isScrollingUp) {
             e.preventDefault();
           } else {
-            // Let the wheel event scroll the container naturally
             return;
           }
         }
@@ -224,6 +263,18 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     };
   }, []);
 
+  // Global Cmd+K / Ctrl+K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // ── Chapter transition handlers ───
 
   const currentChapter = CHAPTERS.find((c) => c.level === targetLevel) ?? CHAPTERS[CHAPTERS.length - 1];
@@ -235,7 +286,17 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   const handleBlockSelect = useCallback((id: string | null) => {
     setSelectedBlock(id);
     if (id && targetLevelRef.current === 4) {
-      setActiveComponentPortal(id);
+      // Introduce a tiny delay (150ms) to ensure responsive feel
+      // while avoiding double-trigger issues
+      setTimeout(() => {
+        // Double check they haven't deselected or changed blocks during the transition
+        setSelectedBlock((current) => {
+          if (current === id) {
+            setActiveComponentPortal(id);
+          }
+          return current;
+        });
+      }, 150);
     }
   }, []);
 
@@ -256,8 +317,18 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
               bounds={() => [48, 60]}
               flipflops={4}
               onIncline={() => setDynamicDpr((d) => Math.min(1.5, d + 0.25))}
-              onDecline={() => setDynamicDpr((d) => Math.max(1, d - 0.25))}
-              onFallback={() => setDynamicDpr(1)}
+              onDecline={() => {
+                setDynamicDpr((d) => Math.max(1, d - 0.25));
+                if (perfMode === "high") {
+                  setShowPerfPrompt(true);
+                }
+              }}
+              onFallback={() => {
+                setDynamicDpr(1);
+                if (perfMode === "high") {
+                  setShowPerfPrompt(true);
+                }
+              }}
             >
               <Suspense fallback={null}>
                 <SceneEl
@@ -299,20 +370,45 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           <span className="text-[15px] font-semibold tracking-[-0.01em] text-white/90">
             Bits&apos;nBrews
           </span>
-          <span className="text-[11px] font-normal text-white/40">
-            Architecture Explorer
-          </span>
         </div>
       </div>
 
       {/* ── Top-right: Explode & Performance toggles ──────────────────────── */}
       <div className="absolute top-6 right-8 z-20 flex flex-col items-end gap-1.5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative">
+          {showPerfPrompt && perfMode === "high" && (
+            <div className="absolute right-[calc(100%+12px)] top-1/2 -translate-y-1/2 flex items-center gap-2 bg-[#ff4a5a] text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap animate-fade-in z-30 border border-white/10">
+              <span>Lagging? Switch to Performance mode for a smoother look!</span>
+              <button 
+                onClick={() => setShowPerfPrompt(false)} 
+                className="hover:text-white/80 font-bold ml-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="flex items-center gap-2 text-[11px] font-medium text-white/55 hover:text-white/90 transition-colors duration-200 border border-white/12 hover:border-white/30 px-3 py-1.5 rounded-md cursor-pointer bg-[#12151d]/80"
+            title="Search Library (Cmd+K)"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            Search
+            <kbd className="hidden sm:inline-block border border-white/20 rounded-[4px] px-1.5 py-0.5 text-[9px] font-mono ml-1 text-white/40">
+              ⌘K
+            </kbd>
+          </button>
+
           <button
             onClick={() => {
               const nextMode = perfMode === "high" ? "low" : "high";
               setPerfMode(nextMode);
               setAutoDowngraded(false);
+              setShowPerfPrompt(false);
             }}
             className="text-[11px] font-medium text-white/55 hover:text-white/90 transition-colors duration-200 border border-white/12 hover:border-white/30 px-3 py-1.5 rounded-md cursor-pointer bg-[#12151d]/80"
             title={perfMode === "high" ? "Switch to performance mode (lighter rendering)" : "Switch to high quality (bloom & antialiasing)"}
@@ -344,19 +440,15 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: targetLevel === 1 ? "auto" : "none",
         }}
       >
-        {/* Edition line */}
-        <div className={`${EYEBROW} text-white/40 mb-7`}>
-          An interactive guide to the modern system-on-chip
-        </div>
-
-        <h1 className="text-[58px] font-semibold leading-[1.06] tracking-[-0.03em] text-white/95 mb-7">
+        <h1 className="text-[58px] font-semibold leading-[1.06] tracking-[-0.03em] text-white/95 mb-7 mt-8">
           What&apos;s really inside <br />
           <span className="article-serif italic font-medium text-white/85">your processor.</span>
         </h1>
         <p className="text-[15px] leading-[1.8] text-white/60 max-w-[460px] mb-10">
-          Bits&apos;nBrews bridges the gap between dense academic papers and
-          practical computer architecture. Travel from the laptop in front of
-          you down to the 3-nanometre silicon it runs on &mdash; one layer at a time.
+          Have you ever wondered what actually happens inside your phone or computer? 
+          We take you on a visual walkthrough from the screen you look at every day 
+          right down to the tiny microscopic circuits that make it all work, explaining 
+          the magic in simple terms, one layer at a time.
         </p>
         <div className="flex items-center gap-5">
           <button
@@ -370,18 +462,29 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             <span>Start the journey</span>
             <span className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">&rarr;</span>
           </button>
-          <span className="text-[12px] text-white/35">5 chapters · ~10 min</span>
+          <button
+            onClick={() => {
+              setTargetLevel(5);
+              setTimeout(() => {
+                const el = document.getElementById("hub-catalog-container");
+                if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+              }, 100);
+            }}
+            className="text-[13px] font-medium text-white/70 hover:text-white transition-colors cursor-pointer tracking-wider"
+          >
+            SUBSCRIBE
+          </button>
         </div>
       </div>
 
-      {/* ── Chapters 2–3: Compact bottom-left — always mounted, fades in/out ── */}
+      {/* ── Chapters 2–4: Compact bottom-left — always mounted, fades in/out ── */}
       <div
-        className="absolute bottom-16 left-8 z-20 max-w-sm"
+        className="absolute left-8 bottom-12 z-20 w-[420px] text-left pointer-events-none"
         style={{
-          opacity: targetLevel > 1 && targetLevel <= 3 && chapterVisible ? 1 : 0,
-          transform: targetLevel > 1 && targetLevel <= 3 && chapterVisible ? "translateY(0)" : "translateY(12px)",
+          opacity: targetLevel > 1 && targetLevel <= 4 && chapterVisible ? 1 : 0,
+          transform: targetLevel > 1 && targetLevel <= 4 && chapterVisible ? "translateY(0)" : "translateY(12px)",
           transition: "opacity 500ms ease, transform 500ms ease",
-          pointerEvents: targetLevel > 1 && targetLevel <= 3 ? "auto" : "none",
+          pointerEvents: targetLevel > 1 && targetLevel <= 4 ? "auto" : "none",
         }}
       >
         <div className={`${EYEBROW} text-[#8aa9ff] mb-2.5`}>
@@ -407,27 +510,22 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         )}
       </div>
       
-      {/* ── Right: Detail panel (level 3 selected track/block) ── */}
+      {/* ── Right: Detail panel (level 3 selected block) ── */}
       {(() => {
-        if (targetLevel !== 3 || (selectedTrack === null && selectedBlock === null)) return null;
+        if (targetLevel !== 3 || selectedBlock === null) return null;
 
-        const activeArticle =
-          selectedTrack !== null
-            ? getTrackArticle(selectedTrack)
-            : selectedBlock !== null
-            ? (() => {
-                const blockLevelMap: Record<string, number> = {
-                  "cpu-big": 4,
-                  "gpu": 5,
-                  "npu": 6,
-                  "modem": 7,
-                  "isp": 8,
-                  "slc": 9,
-                };
-                const lvl = blockLevelMap[selectedBlock];
-                return lvl ? getArticleForLevel(lvl) : getArticleForLevel(3);
-              })()
-            : "";
+        const activeArticle = (() => {
+          const blockLevelMap: Record<string, number> = {
+            "cpu-big": 4,
+            "gpu": 5,
+            "npu": 6,
+            "modem": 7,
+            "isp": 8,
+            "slc": 9,
+          };
+          const lvl = blockLevelMap[selectedBlock];
+          return lvl ? getArticleForLevel(lvl) : getArticleForLevel(3);
+        })();
 
         const isVisible = chapterVisible;
 
@@ -445,11 +543,10 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           >
             <div className="flex justify-between items-center mb-2">
               <div className={`${EYEBROW} text-[#8aa9ff]`}>
-                {selectedTrack !== null ? "Technical track" : "Block detail"}
+                Block detail
               </div>
               <button
                 onClick={() => {
-                  setSelectedTrack(null);
                   setSelectedBlock(null);
                 }}
                 aria-label="Close panel"
@@ -464,6 +561,27 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           </div>
         );
       })()}
+
+      {/* ── Chapter 4 3D Keyboard Accessibility ────────────────────────────── */}
+      {targetLevel === 4 && (
+        <div className="sr-only" aria-live="polite">
+          {BLOCKS.filter(b => ARTICLE_BLOCK_IDS.has(b.id)).map((block) => (
+            <button
+              key={block.id}
+              className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-1/2 focus:-translate-x-1/2 focus:z-50 focus:bg-[#12151d] focus:text-white focus:px-4 focus:py-2 focus:rounded-md focus:border focus:border-[#8aa9ff]"
+              onFocus={() => setSelectedBlock(block.id)}
+              onBlur={() => setSelectedBlock(null)}
+              onClick={() => {
+                setSelectedBlock(block.id);
+                setActiveComponentPortal(block.id);
+              }}
+              tabIndex={0}
+            >
+              Open details for {block.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Right side: Chapter navigation dots ──────────────────────────── */}
       <div
@@ -506,7 +624,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Chapter 3: Technical Tracks Menu ───────────────────────────────── */}
       <div
-        className="panel absolute top-[110px] left-8 z-20 w-[340px] rounded-xl p-5 text-left"
+        className="panel absolute top-[110px] left-8 z-20 w-[340px] rounded-xl p-5 text-left flex flex-col max-h-[calc(100vh-410px)]"
         style={{
           opacity: targetLevel === 3 && chapterVisible ? 1 : 0,
           transform: targetLevel === 3 && chapterVisible ? "translateY(0)" : "translateY(-12px)",
@@ -517,32 +635,22 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         <div className={`${EYEBROW} text-[#8aa9ff] mb-4`}>
           Publication tracks
         </div>
-        <div className="flex flex-col gap-1.5 max-h-[58vh] overflow-y-auto pr-1 scrollbar-none">
+        <div className="flex flex-col gap-1.5 overflow-y-auto pr-1 scrollbar-none flex-1">
           {TRACKS.map((track, idx) => {
-            const active = selectedTrack === track.id;
             const numStr = String(idx + 1).padStart(2, "0");
             return (
               <button
                 key={track.id}
                 onClick={() => {
-                  setSelectedTrack(track.id);
-                  setSelectedBlock(null);
+                  setActiveTrackPageId(track.id);
                 }}
-                className={`flex items-start gap-3.5 text-left px-3 py-2.5 rounded-lg transition-colors duration-200 group cursor-pointer ${
-                  active
-                    ? "bg-[#8aa9ff]/10"
-                    : "hover:bg-white/[0.05]"
-                }`}
+                className="flex items-start gap-3.5 text-left px-3 py-2.5 rounded-lg transition-colors duration-200 group cursor-pointer hover:bg-white/[0.05]"
               >
-                <span className={`text-[11px] font-mono mt-0.5 transition-colors ${
-                  active ? "text-[#8aa9ff]" : "text-white/30 group-hover:text-white/55"
-                }`}>
+                <span className="text-[11px] font-mono mt-0.5 text-white/30 group-hover:text-white/55 transition-colors">
                   {numStr}
                 </span>
                 <div className="flex flex-col">
-                  <span className={`text-[12.5px] font-medium transition-colors ${
-                    active ? "text-[#aec3ff]" : "text-white/85 group-hover:text-white"
-                  }`}>
+                  <span className="text-[12.5px] font-medium text-white/85 group-hover:text-white transition-colors">
                     {track.name}
                   </span>
                   <span className="text-[11px] text-white/45 leading-snug mt-0.5">
@@ -566,7 +674,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       {/* ── Level 11: Hub Directory & Team Dashboard (Single Column Redesign) ── */}
       <div
         id="hub-catalog-container"
-        className="absolute inset-x-8 z-25 text-left overflow-y-auto scrollbar-thin"
+        className="absolute inset-x-0 z-25 text-left overflow-y-auto scrollbar-thin"
         style={{
           top: "96px",
           bottom: "24px",
@@ -582,7 +690,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           setHubAtBottom(nearBottom);
         }}
       >
-        <div className="max-w-[760px] mx-auto flex flex-col gap-8 pr-3">
+        <div className="max-w-[760px] mx-auto flex flex-col gap-8 px-6 sm:px-8">
           {/* Header */}
           <div className="text-center mt-6">
             <h1 className="article-serif text-[44px] font-semibold tracking-[-0.01em] text-white/95">
@@ -638,108 +746,67 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           </div>
 
           {/* Tracks List */}
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {TRACKS.map((track, idx) => {
               const numStr = String(idx + 1).padStart(2, "0");
               return (
                 <div
                   key={track.id}
-                  className="panel hover:border-white/16 transition-colors duration-200 p-6 rounded-xl flex gap-6 group"
+                  style={{
+                    opacity: targetLevel === 5 ? 1 : 0,
+                    transform: targetLevel === 5 ? "translateY(0)" : "translateY(16px)",
+                    transition: `opacity 600ms ease ${idx * 80}ms, transform 600ms ease ${idx * 80}ms`
+                  }}
                 >
-                  <div className="text-[13px] font-mono text-white/30 leading-[1.6] shrink-0 w-8">
-                    {numStr}
-                  </div>
-                  <div className="flex flex-col flex-1 text-left">
-                    <h3 className="text-[16px] font-semibold text-white/90 group-hover:text-[#aec3ff] transition-colors">
-                      {track.name}
-                    </h3>
-                    <p className="text-[13px] leading-relaxed text-white/55 mt-2">
-                      {track.longSummary}
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => setActiveTrackPageId(track.id)}
+                    className="group relative flex flex-col text-left w-full h-full rounded-2xl border border-white/10 bg-[#12151d] hover:bg-[#1a1d27] hover:border-white/20 transition-all duration-300 overflow-hidden hover:-translate-y-1 shadow-lg"
+                  >
+                    {/* Glowy background effect */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#8aa9ff]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                    
+                    <div className="p-6 sm:p-7 flex flex-col h-full relative z-10">
+                      <div className="flex items-start justify-between mb-4">
+                        <span className="text-3xl filter drop-shadow-sm group-hover:scale-110 transition-transform duration-300 origin-bottom-left">
+                          {track.icon}
+                        </span>
+                        <span className="text-[11px] font-mono font-medium text-white/30 group-hover:text-[#8aa9ff] transition-colors tracking-widest">
+                          NO. {numStr}
+                        </span>
+                      </div>
+                      
+                      <h3 className="text-[18px] font-semibold text-white/95 group-hover:text-white transition-colors mb-2.5">
+                        {track.name}
+                      </h3>
+                      <p className="text-[13px] leading-relaxed text-white/60 group-hover:text-white/75 transition-colors flex-grow">
+                        {track.longSummary}
+                      </p>
+                      
+                      <div className="mt-5 flex items-center text-[12px] font-medium text-[#8aa9ff] opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-1 group-hover:translate-x-0">
+                        Explore Track &rarr;
+                      </div>
+                    </div>
+                  </button>
                 </div>
               );
             })}
           </div>
 
-          {/* Subscribe Newsletter Section */}
-          <div className="panel rounded-xl p-8 text-center mt-6">
-            <div className="max-w-md mx-auto">
-              <h2 className="article-serif text-[24px] font-semibold tracking-tight text-white/95 mb-2.5">
-                The newsletter
-              </h2>
-              <p className="text-[13px] text-white/55 leading-relaxed mb-6">
-                Spatial-first writeups on silicon layouts, execution pipelines, and
-                instruction-set trade-offs. Written for engineers and the engineering-curious.
-              </p>
-
-              {subscribed ? (
-                <div className="py-4 text-center animate-fade-in">
-                  <div className="relative w-11 h-11 mx-auto mb-4 flex items-center justify-center rounded-full bg-[#5bd6a2]/12 border border-[#5bd6a2]/40">
-                    <svg className="w-4 h-4 text-[#5bd6a2]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" className="animate-checkmark" />
-                    </svg>
-                  </div>
-                  <div className="text-[13px] font-medium text-white/90">
-                    You&apos;re on the list
-                  </div>
-                  <p className="text-[12px] text-white/50 mt-1.5 max-w-xs mx-auto leading-relaxed">
-                    Check your inbox to confirm your subscription.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!email) return;
-                      setSubmitting(true);
-                      setTimeout(() => {
-                        setSubmitting(false);
-                        setSubscribed(true);
-                      }, 1000);
-                    }}
-                    className="flex flex-col sm:flex-row gap-2"
-                  >
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      aria-label="Email address"
-                      className="flex-1 bg-[#0b0d12] border border-white/12 focus:border-[#8aa9ff] focus:ring-1 focus:ring-[#8aa9ff]/40 outline-none text-[13px] px-4 py-3 rounded-lg text-white transition-colors duration-200 placeholder-white/30"
-                      required
-                      disabled={submitting}
-                    />
-                    <button
-                      type="submit"
-                      className="bg-white/95 hover:bg-white text-[#0b0d12] font-medium text-[13px] px-6 py-3 rounded-lg transition-colors duration-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
-                      disabled={submitting}
-                    >
-                      {submitting ? (
-                        <span className="flex items-center gap-2">
-                          <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Subscribing
-                        </span>
-                      ) : (
-                        "Subscribe"
-                      )}
-                    </button>
-                  </form>
-                  <p className="mt-4 text-[11px] text-white/35">
-                    Published fortnightly. No marketing, unsubscribe anytime.
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-          
-          {/* Spacer to prevent visual clipping/cutoff at the bottom of the flex list */}
-          <div className="h-32 shrink-0 pointer-events-none" />
         </div>
+
+        {/* ── Subscribe Newsletter: Full Sweep Footer ── */}
+        <Footer 
+          onNavigateToDie={() => {
+            setTargetLevel(2);
+            setShowPlayground(true);
+          }}
+          onNavigateToTracks={() => {
+            const el = document.getElementById("hub-catalog-container");
+            if (el) {
+              el.scrollTo({ top: 380, behavior: "smooth" });
+            }
+          }}
+        />
       </div>
 
       {/* ── Bottom: progress bar + scroll hint ───────────────────────────── */}
@@ -776,6 +843,16 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         />
       )}
 
+      {activeTrackPageId && (
+        <TrackPage
+          trackId={activeTrackPageId}
+          onClose={() => setActiveTrackPageId(null)}
+          onReadArticle={(articleId) => {
+            setReaderArticleId(articleId);
+          }}
+        />
+      )}
+
       {activeComponentPortal && (
         <ComponentPortal
           componentId={activeComponentPortal}
@@ -793,8 +870,16 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         if (!readerArticleId) return null;
         const article = getArticle(readerArticleId);
         if (!article) return null;
-        return <ArticleReader article={article} onClose={() => setReaderArticleId(null)} />;
+        return <ArticleReader article={article} onClose={() => setReaderArticleId(null)} onNavigate={(id) => setReaderArticleId(id)} />;
       })()}
+
+      {/* ── Global Search Palette ──────────────────────────────────────────── */}
+      <SearchPalette
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelectArticle={(id) => setReaderArticleId(id)}
+        onSelectTrack={(id) => setActiveTrackPageId(id)}
+      />
 
       {/* ── Boot screen — branded cover while shaders compile ─────────────── */}
       <div

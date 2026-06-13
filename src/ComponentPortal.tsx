@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getComponent, getArticle } from "./articles";
 import { DOMAIN_ACCENTS } from "./soc/data";
+import { Footer } from "./components/Footer";
 
 interface ComponentPortalProps {
   componentId: string;
@@ -121,13 +122,15 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
   const comp = getComponent(componentId);
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => setEntered(true));
+    // A slightly longer timeout guarantees the browser registers the mounting state
+    // before applying the CSS transition.
+    const timer = setTimeout(() => setEntered(true), 50);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
-      cancelAnimationFrame(id);
+      clearTimeout(timer);
       window.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
@@ -140,14 +143,14 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0d12]/85 backdrop-blur-sm transition-opacity duration-300 p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0d12]/80 backdrop-blur-md transition-opacity duration-500 ease-in-out p-4 sm:p-8"
       style={{ opacity: entered ? 1 : 0 }}
       onClick={onClose}
     >
       {/* Main panel */}
       <div
-        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_2px_6px_rgba(0,0,0,0.4),0_24px_64px_rgba(0,0,0,0.5)] flex flex-col gap-8 scrollbar-thin transition-transform duration-400 ease-out"
-        style={{ transform: entered ? "scale(1) translateY(0)" : "scale(0.97) translateY(8px)" }}
+        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_4px_12px_rgba(0,0,0,0.5),0_32px_80px_rgba(0,0,0,0.6)] flex flex-col gap-8 scrollbar-thin transition-opacity duration-500 ease-in-out"
+        style={{ opacity: entered ? 1 : 0 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -291,6 +294,7 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
             )}
           </div>
         </div>
+
       </div>
     </div>
   );

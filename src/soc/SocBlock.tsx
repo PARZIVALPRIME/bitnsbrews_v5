@@ -304,7 +304,7 @@ export function SocBlock({
             <Html
               position={labelPt}
               center
-              distanceFactor={28}
+              distanceFactor={32}
               zIndexRange={[100, 0]}
               occlude={false}
             >
@@ -319,34 +319,34 @@ export function SocBlock({
                 className="pointer-events-auto select-none whitespace-nowrap cursor-pointer text-left block bg-transparent border-0 p-0"
               >
                 <div
-                  className="rounded-md px-1.5 py-0.5 transition-colors duration-200"
+                  className="rounded-md px-2.5 py-1.5 transition-colors duration-200"
                   style={{
-                    background: "rgba(15,18,26,0.94)",
-                    border: `0.5px solid ${selected ? accent : "rgba(255,255,255,0.14)"}`,
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+                    background: "rgba(15,18,26,0.95)",
+                    border: `1px solid ${selected ? accent : "rgba(255,255,255,0.16)"}`,
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
                     opacity: opacity,
                   }}
                 >
                   <div
-                    className="font-semibold leading-none"
+                    className="font-bold leading-tight"
                     style={{
-                      color: selected ? "#f4f6fa" : "rgba(235,240,250,0.78)",
-                      fontSize: selected ? "8px" : "7px",
+                      color: selected ? "#f4f6fa" : "rgba(235,240,250,0.9)",
+                      fontSize: selected ? "12px" : "10px",
                     }}
                   >
                     {block.name}
                   </div>
                   {selected && (
                     <div
-                      className="mt-0.5 leading-none"
-                      style={{ color: "rgba(226,232,244,0.5)", fontSize: "6px" }}
+                      className="mt-1 leading-snug"
+                      style={{ color: "rgba(226,232,244,0.65)", fontSize: "9px" }}
                     >
                       {block.fn}
                     </div>
                   )}
                   <div
-                    className="mt-px font-mono leading-none"
-                    style={{ color: selected ? accent : "rgba(226,232,244,0.35)", fontSize: "5.5px" }}
+                    className="mt-1 font-mono leading-none"
+                    style={{ color: selected ? accent : "rgba(226,232,244,0.45)", fontSize: "8.5px" }}
                   >
                     {block.w.toFixed(1)}×{block.d.toFixed(1)}×{h.toFixed(1)}u
                   </div>

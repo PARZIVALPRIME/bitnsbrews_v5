@@ -85,36 +85,11 @@ export function MotherboardPCB({ active }: { active: boolean }) {
       </mesh>
 
       {/* PCB Trace Pattern Lines */}
-      {[-8, -4, 0, 4, 8].map((x, i) => (
-        <mesh key={i} position={[x, 0.21, 0]}>
-          <boxGeometry args={[0.08, 0.01, 22]} />
-          <meshStandardMaterial color={AMBER} emissive={AMBER} emissiveIntensity={0.25} />
-        </mesh>
-      ))}
-      {[-6, -2, 2, 6].map((z, i) => (
-        <mesh key={i} position={[0, 0.21, z]}>
-          <boxGeometry args={[26, 0.01, 0.08]} />
-          <meshStandardMaterial color={AMBER} emissive={AMBER} emissiveIntensity={0.25} />
-        </mesh>
-      ))}
+      <InstancedMotherboardTracesV />
+      <InstancedMotherboardTracesH />
 
       {/* Capacitors and Power Inductors */}
-      {[-12, 12].map((x) =>
-        [-10, 0, 10].map((z, idx) => (
-          <group key={`${x}-${z}-${idx}`} position={[x, 0.6, z]}>
-            {/* Cylinder body */}
-            <mesh castShadow>
-              <cylinderGeometry args={[0.8, 0.8, 1.2, 12]} />
-              <meshStandardMaterial {...metalMat("#3a3e47", 0.2, 0.95)} />
-            </mesh>
-            {/* Top stripe */}
-            <mesh position={[0, 0.61, 0]}>
-              <cylinderGeometry args={[0.79, 0.79, 0.08, 12]} />
-              <meshStandardMaterial color={AMBER} />
-            </mesh>
-          </group>
-        ))
-      )}
+      <InstancedMotherboardCapacitors />
 
       {/* VRM Inductor Blocks (glowing cubes) */}
       {[-8, -6, -4, 4, 6, 8].map((x, i) => (
@@ -498,6 +473,83 @@ export function GaaTransistorModel({
           <meshStandardMaterial color="#51c4d3" transparent opacity={0.15} roughness={0.1} />
         </mesh>
       </group>
+    </group>
+  );
+}
+
+function InstancedMotherboardTracesV() {
+  const ref = useRef<THREE.InstancedMesh>(null!);
+  useLayoutEffect(() => {
+    const dummy = new THREE.Object3D();
+    [-8, -4, 0, 4, 8].forEach((x, i) => {
+      dummy.position.set(x, 0.21, 0);
+      dummy.updateMatrix();
+      ref.current.setMatrixAt(i, dummy.matrix);
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
+  }, []);
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, 5]}>
+      <boxGeometry args={[0.08, 0.01, 22]} />
+      <meshStandardMaterial color={AMBER} emissive={AMBER} emissiveIntensity={0.25} />
+    </instancedMesh>
+  );
+}
+
+function InstancedMotherboardTracesH() {
+  const ref = useRef<THREE.InstancedMesh>(null!);
+  useLayoutEffect(() => {
+    const dummy = new THREE.Object3D();
+    [-6, -2, 2, 6].forEach((z, i) => {
+      dummy.position.set(0, 0.21, z);
+      dummy.updateMatrix();
+      ref.current.setMatrixAt(i, dummy.matrix);
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
+  }, []);
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, 4]}>
+      <boxGeometry args={[26, 0.01, 0.08]} />
+      <meshStandardMaterial color={AMBER} emissive={AMBER} emissiveIntensity={0.25} />
+    </instancedMesh>
+  );
+}
+
+function InstancedMotherboardCapacitors() {
+  const bodyRef = useRef<THREE.InstancedMesh>(null!);
+  const stripeRef = useRef<THREE.InstancedMesh>(null!);
+
+  useLayoutEffect(() => {
+    const dummy = new THREE.Object3D();
+    let i = 0;
+    [-12, 12].forEach((x) => {
+      [-10, 0, 10].forEach((z) => {
+        dummy.position.set(x, 0.6, z);
+        dummy.updateMatrix();
+        bodyRef.current.setMatrixAt(i, dummy.matrix);
+        
+        dummy.position.set(x, 1.21, z);
+        dummy.updateMatrix();
+        stripeRef.current.setMatrixAt(i, dummy.matrix);
+        i++;
+      });
+    });
+    if (bodyRef.current && stripeRef.current) {
+      bodyRef.current.instanceMatrix.needsUpdate = true;
+      stripeRef.current.instanceMatrix.needsUpdate = true;
+    }
+  }, []);
+
+  return (
+    <group>
+      <instancedMesh ref={bodyRef} args={[undefined, undefined, 6]} castShadow>
+        <cylinderGeometry args={[0.8, 0.8, 1.2, 12]} />
+        <meshStandardMaterial {...metalMat("#3a3e47", 0.2, 0.95)} />
+      </instancedMesh>
+      <instancedMesh ref={stripeRef} args={[undefined, undefined, 6]}>
+        <cylinderGeometry args={[0.79, 0.79, 0.08, 12]} />
+        <meshStandardMaterial color={AMBER} />
+      </instancedMesh>
     </group>
   );
 }

@@ -43,7 +43,7 @@ export const ZOOM_LEVELS: ZoomLevel[] = [
     name: "The Library",
     subtitle: "Knowledge Map",
     description: "The die as a table of contents. Every block rises, and each main block carries one editorial track. Click a block to read.",
-    defaultPosition: [2, 19, 28],
+    defaultPosition: [2.5, 22.5, 33],
     defaultTarget: [0, 3.4, 0],
     fov: 32,
   },

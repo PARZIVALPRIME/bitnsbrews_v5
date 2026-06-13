@@ -91,7 +91,25 @@ body {
   cursor: pointer;
 }
 
-/* Custom minimal scrollbar for technical panels */
+/* Custom minimal scrollbar for technical panels and global */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
 }
@@ -106,7 +124,11 @@ body {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--accent);
+}
+
+html {
+  scrollbar-color: rgba(255, 255, 255, 0.15) var(--bg);
 }
 
 /* Newsletter success check */

@@ -10,7 +10,7 @@ export const CHAPTERS = [
     title: "The Machine",
     subtitle: "System Casing & Enclosure",
     description:
-      "Every computation begins at the physical boundary. The outer enclosure provides structural integrity, thermal management pathways, and electromagnetic shielding — the invisible architecture before the silicon.",
+      "Every computer begins with its physical shell. The outer casing does a lot more than just look good. It keeps the machine cool, protects the parts inside, and shields them from electrical interference, creating the perfect environment for the silicon to do its job.",
   },
   {
     level: 2,
@@ -20,7 +20,7 @@ export const CHAPTERS = [
     title: "The Package",
     subtitle: "MCM Silicon Substrate",
     description:
-      "Where silicon meets the board. The Multi-Chip Module substrate bridges micro-bump pitches of <100μm to PCB traces in millimeters — a 1000× scale transition solved in organic laminate.",
+      "This is where the brain of the computer connects to the rest of the system. The package acts as a bridge, translating microscopic connections on the chip to larger wires on the main circuit board so they can talk to each other.",
   },
   {
     level: 3,
@@ -30,7 +30,7 @@ export const CHAPTERS = [
     title: "Silicon Die",
     subtitle: "3nm SoC Floorplan Layout",
     description:
-      "12 billion transistors. 22×18mm of silicon. Fabricated with extreme ultraviolet (EUV) lithography at a 3nm Gate-All-Around process node. This is Bits'nBrews territory — where physics meets architecture.",
+      "Deep inside, billions of tiny switches work together on a piece of silicon smaller than a postage stamp. Made with advanced technology, this is the core where raw electricity turns into logical decisions.",
   },
   {
     level: 4,
@@ -40,7 +40,7 @@ export const CHAPTERS = [
     title: "The Library",
     subtitle: "The Die as a Table of Contents",
     description:
-      "Every functional block on this die maps to a concept worth understanding deeply. Click a block — or browse the index — to read the engineering story behind the silicon.",
+      "Click on any of the glowing functional blocks on the die to pull up its dedicated deep dive, hardware specs, and related articles.",
   },
   {
     level: 5,
@@ -50,7 +50,7 @@ export const CHAPTERS = [
     title: "The Hub",
     subtitle: "Technical Index & Team Directory",
     description:
-      "Welcome to the central hub. Browse all 9 general technical tracks, full articles, and meet the team behind the Bits'nBrews Digital Engineering Museum.",
+      "Welcome to our main library. Here you can explore our complete collection of technical articles, dive into specialized tracks, and meet the creators who put this guide together.",
   },
 ];
 
