@@ -158,115 +158,86 @@ export function ComponentPortal({ componentId, isReaderOpen = false, onClose, on
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0d12]/80 backdrop-blur-md p-4 sm:p-8"
-      style={{
-        opacity: open ? 1 : 0,
-        transitionProperty: "opacity",
-        transitionDuration: closing ? "260ms" : "340ms",
-        transitionTimingFunction: "ease-out",
-        pointerEvents: open ? "auto" : "none",
-      }}
+      className="fixed inset-0 z-50 flex justify-end bg-transparent pointer-events-auto"
       onClick={handleClose}
     >
-      {/* Main panel */}
+      {/* Right Sidebar Panel */}
       <div
-        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_4px_12px_rgba(0,0,0,0.5),0_32px_80px_rgba(0,0,0,0.6)] flex flex-col gap-8 scrollbar-thin"
+        className="relative w-full max-w-[420px] h-full overflow-y-auto border-l border-white/10 bg-[#0c0d12]/96 p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col gap-6 scrollbar-none pointer-events-auto animate-fade-in"
         style={{
           opacity: open ? 1 : 0,
           transform: open
-            ? "scale(1) translate3d(0, 0, 0)"
+            ? "translate3d(0, 0, 0)"
             : closing
-              ? "scale(0.97) translate3d(0, 10px, 0)"
+              ? "translate3d(40px, 0, 0) scale(0.98)"
               : isReaderOpen
-                ? "scale(0.97) translate3d(0, -12px, 0)"
-                : "scale(0.96) translate3d(0, 14px, 0)",
+                ? "translate3d(0, -12px, 0) scale(0.98)"
+                : "translate3d(40px, 0, 0)",
           transitionProperty: "opacity, transform",
-          transitionDuration: closing ? "300ms" : "460ms",
+          transitionDuration: closing ? "240ms" : "400ms",
           transitionTimingFunction: EASE,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header — leads the staggered content reveal */}
-        <div
-          className="flex items-start justify-between border-b border-white/8 pb-6"
-          style={{
-            opacity: open ? 1 : 0,
-            transform: open ? "translate3d(0, 0, 0)" : "translate3d(0, 8px, 0)",
-            transitionProperty: "opacity, transform",
-            transitionDuration: "420ms",
-            transitionTimingFunction: EASE,
-            transitionDelay: open ? "90ms" : "0ms",
-          }}
-        >
-          <div className="flex items-center gap-4">
+        {/* Header */}
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3.5">
             <span
-              className="flex items-center justify-center w-14 h-14 rounded-xl border shrink-0"
+              className="flex items-center justify-center w-11 h-11 rounded-xl border shrink-0"
               style={{ borderColor: `${accent}40`, background: `${accent}14` }}
             >
               <ComponentIcon id={comp.id} color={accent} />
             </span>
             <div className="text-left">
-              <span className="text-[11px] font-medium tracking-[0.1em] uppercase" style={{ color: accent }}>
+              <span className="text-[9.5px] font-mono tracking-[0.12em] uppercase" style={{ color: accent }}>
                 {comp.tag}
               </span>
-              <h1 className="text-2xl sm:text-[28px] font-semibold tracking-tight text-white mt-1">
+              <h1 className="text-[20px] font-semibold tracking-tight text-white/90">
                 {comp.name}
               </h1>
-              <p className="text-[13px] text-white/55 mt-1 max-w-[560px] leading-relaxed">
-                {comp.shortDesc}
-              </p>
             </div>
           </div>
-
           <button
             onClick={handleClose}
-            aria-label="Close (Esc)"
-            className="flex items-center gap-2 text-[12px] text-white/50 hover:text-white/90 border border-white/12 hover:border-white/25 rounded-lg px-3.5 py-2 transition-colors duration-200 cursor-pointer shrink-0"
+            aria-label="Close"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-white/40 hover:text-white/90 hover:bg-white/10 transition-colors cursor-pointer border border-white/10"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-            <span>Close</span>
-            <kbd className="text-[10px] text-white/30 font-mono">esc</kbd>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
 
-        {/* Content */}
-        <div
-          className="grid grid-cols-1 md:grid-cols-12 gap-8 text-left"
-          style={{
-            opacity: open ? 1 : 0,
-            transform: open ? "translate3d(0, 0, 0)" : "translate3d(0, 10px, 0)",
-            transitionProperty: "opacity, transform",
-            transitionDuration: "460ms",
-            transitionTimingFunction: EASE,
-            transitionDelay: open ? "150ms" : "0ms",
-          }}
-        >
+        {/* Short description */}
+        <p className="text-[12.5px] leading-relaxed text-white/60 -mt-1.5 text-left">
+          {comp.shortDesc}
+        </p>
 
-          {/* Left column — specs + textbook gap */}
-          <div className="md:col-span-5 flex flex-col gap-5">
-            <div className="rounded-xl border border-white/8 bg-[#0e1118] p-5">
-              <h3 className="text-[11px] font-medium tracking-[0.1em] text-white/45 uppercase pb-3 border-b border-white/8 mb-1">
-                Specifications
-              </h3>
-              <SpecRow label="Die area" value={comp.area} />
-              <SpecRow label="Clock frequency" value={comp.clockSpeed} />
-              <SpecRow label="Lithography" value={comp.process} />
-              <SpecRow label="Power profile" value={comp.powerFocus} />
-            </div>
+        <hr className="border-white/8 -my-1.5" />
 
-            <div className="rounded-xl border border-white/8 bg-[#0e1118] p-5">
-              <h3 className="text-[11px] font-medium tracking-[0.1em] text-white/45 uppercase mb-3">
-                What textbooks omit
-              </h3>
-              <p className="text-[13px] leading-[1.7] text-white/65">
-                {comp.textbookOmission}
-              </p>
-            </div>
+        <div className="flex flex-col gap-6 text-left">
+          {/* Specs */}
+          <div className="rounded-xl border border-white/8 bg-[#0e1118]/80 p-4">
+            <h3 className="text-[10px] font-mono tracking-[0.1em] text-white/45 uppercase pb-2 border-b border-white/8 mb-1.5">
+              Specifications
+            </h3>
+            <SpecRow label="Die area" value={comp.area} />
+            <SpecRow label="Clock frequency" value={comp.clockSpeed} />
+            <SpecRow label="Lithography" value={comp.process} />
+            <SpecRow label="Power profile" value={comp.powerFocus} />
           </div>
 
-          {/* Right column — learning path */}
-          <div className="md:col-span-7 flex flex-col gap-4">
-            <h3 className="text-[11px] font-medium tracking-[0.1em] text-white/45 uppercase">
+          {/* What textbooks omit */}
+          <div className="rounded-xl border border-white/8 bg-[#0e1118]/80 p-4">
+            <h3 className="text-[10px] font-mono tracking-[0.1em] text-white/45 uppercase mb-2">
+              What textbooks omit
+            </h3>
+            <p className="text-[12px] leading-[1.65] text-white/60">
+              {comp.textbookOmission}
+            </p>
+          </div>
+
+          {/* Learning path */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-[10px] font-mono tracking-[0.1em] text-white/45 uppercase">
               Learning path
             </h3>
 
@@ -276,37 +247,35 @@ export function ComponentPortal({ componentId, isReaderOpen = false, onClose, on
                 onClick={() => onReadArticle(basicArticle.id)}
                 onMouseEnter={() => setHoveredStep(1)}
                 onMouseLeave={() => setHoveredStep(null)}
-                className="group rounded-xl border p-5 cursor-pointer flex flex-col gap-3 text-left"
+                className="group rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 text-left transition-all duration-300"
                 style={{
                   borderColor: hoveredStep === 1 ? `${accent}50` : "rgba(255,255,255,0.08)",
                   background: hoveredStep === 1 ? `${accent}0a` : "#0e1118",
-                  transform: hoveredStep === 1 ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)",
-                  boxShadow: hoveredStep === 1 ? `0 4px 20px ${accent}15` : "none",
-                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                  transform: hoveredStep === 1 ? "translate3d(0, -1px, 0)" : "translate3d(0, 0, 0)",
                 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium" style={{ color: accent }}>
+                  <span className="text-[9.5px] font-mono font-medium" style={{ color: accent }}>
                     Step 1 · Fundamentals
                   </span>
-                  <span className="text-[11px] font-mono text-white/35">
+                  <span className="text-[9.5px] font-mono text-white/35">
                     {basicArticle.readTime}
                   </span>
                 </div>
                 <div>
-                  <h4 className="text-[15.5px] font-semibold text-white/90 leading-snug">
+                  <h4 className="text-[14px] font-semibold text-white/90 leading-tight">
                     {basicArticle.title}
                   </h4>
-                  <p className="text-[12.5px] leading-relaxed text-white/55 mt-1.5">
+                  <p className="text-[11.5px] leading-relaxed text-white/50 mt-1">
                     {basicArticle.subtitle}
                   </p>
                 </div>
-                <div className="flex items-center gap-2.5 mt-1">
-                  <div className="w-6 h-6 rounded-full bg-white/8 border border-white/12 flex items-center justify-center text-[10px] font-medium text-white/70">
+                <div className="flex items-center gap-2 mt-1 pt-2 border-t border-white/5">
+                  <div className="w-5.5 h-5.5 rounded-full bg-white/8 border border-white/12 flex items-center justify-center text-[9px] font-medium text-white/70">
                     {basicArticle.author[0]}
                   </div>
-                  <span className="text-[12px] text-white/50">{basicArticle.author}</span>
-                  <span className="text-[12px] text-white/35 ml-auto group-hover:text-white/70 group-hover:translate-x-0.5 transition-all duration-200">
+                  <span className="text-[11px] text-white/45">{basicArticle.author}</span>
+                  <span className="text-[11px] text-white/35 ml-auto group-hover:text-white/70 group-hover:translate-x-0.5 transition-all duration-200">
                     Read &rarr;
                   </span>
                 </div>
@@ -319,53 +288,49 @@ export function ComponentPortal({ componentId, isReaderOpen = false, onClose, on
                 onClick={() => onReadArticle(advancedArticle.id)}
                 onMouseEnter={() => setHoveredStep(2)}
                 onMouseLeave={() => setHoveredStep(null)}
-                className="group rounded-xl border p-5 cursor-pointer flex flex-col gap-3 text-left"
+                className="group rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 text-left transition-all duration-300"
                 style={{
                   borderColor: hoveredStep === 2 ? `${accent}50` : "rgba(255,255,255,0.08)",
                   background: hoveredStep === 2 ? `${accent}0a` : "#0e1118",
-                  transform: hoveredStep === 2 ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)",
-                  boxShadow: hoveredStep === 2 ? `0 4px 20px ${accent}15` : "none",
-                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                  transform: hoveredStep === 2 ? "translate3d(0, -1px, 0)" : "translate3d(0, 0, 0)",
                 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-white/55">
+                  <span className="text-[9.5px] font-mono font-medium text-white/55">
                     Step 2 · {comp.advancedTrackName}
                   </span>
-                  <span className="text-[11px] font-mono text-white/35">
+                  <span className="text-[9.5px] font-mono text-white/35">
                     {advancedArticle.readTime}
                   </span>
                 </div>
                 <div>
-                  <h4 className="text-[15.5px] font-semibold text-white/90 leading-snug">
+                  <h4 className="text-[14px] font-semibold text-white/90 leading-tight">
                     {advancedArticle.title}
                   </h4>
-                  <p className="text-[12.5px] leading-relaxed text-white/55 mt-1.5">
+                  <p className="text-[11.5px] leading-relaxed text-white/50 mt-1">
                     {advancedArticle.subtitle}
                   </p>
                 </div>
-                <div className="flex items-center gap-2.5 mt-1">
-                  <div className="w-6 h-6 rounded-full bg-white/8 border border-white/12 flex items-center justify-center text-[10px] font-medium text-white/70">
+                <div className="flex items-center gap-2 mt-1 pt-2 border-t border-white/5">
+                  <div className="w-5.5 h-5.5 rounded-full bg-white/8 border border-white/12 flex items-center justify-center text-[9px] font-medium text-white/70">
                     {advancedArticle.author[0]}
                   </div>
-                  <span className="text-[12px] text-white/50">{advancedArticle.author}</span>
-                  <span className="text-[12px] text-white/35 ml-auto group-hover:text-white/70 group-hover:translate-x-0.5 transition-all duration-200">
+                  <span className="text-[11px] text-white/45">{advancedArticle.author}</span>
+                  <span className="text-[11px] text-white/35 ml-auto group-hover:text-white/70 group-hover:translate-x-0.5 transition-all duration-200">
                     Read &rarr;
                   </span>
                 </div>
               </button>
             ) : (
-              <div className="rounded-xl border border-dashed border-white/12 p-5 text-center flex flex-col items-center justify-center gap-1.5 h-[120px] select-none">
-                <span className="text-[11px] font-medium text-white/45">
+              <div className="rounded-xl border border-dashed border-white/12 bg-[#0e1118]/30 p-4 text-center flex flex-col items-center justify-center gap-1 h-[80px] select-none">
+                <span className="text-[9.5px] font-mono text-white/45">
                   Step 2 · {comp.advancedTrackName}
                 </span>
-                <span className="text-[13px] font-medium text-white/65">In progress</span>
-                <span className="text-[11.5px] text-white/40">This deep dive is being written — subscribe for updates.</span>
+                <span className="text-[12px] font-medium text-white/60">In progress</span>
               </div>
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

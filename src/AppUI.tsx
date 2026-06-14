@@ -571,11 +571,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: "auto",
         }}
       >
-        <h1 className="text-[58px] font-semibold leading-[1.06] tracking-[-0.03em] text-white/95 mb-7 mt-8">
+        <h1 className="text-[38px] font-semibold leading-[1.15] tracking-tight text-white/95 mb-6 mt-8">
           What&apos;s really inside <br />
-          <span className="article-serif italic font-medium text-white/85">your processor.</span>
+          <span className="article-serif italic font-normal text-white/80">your processor.</span>
         </h1>
-        <p className="text-[15px] leading-[1.8] text-white/60 max-w-[460px] mb-10">
+        <p className="text-[13.5px] leading-[1.7] text-white/55 max-w-[420px] mb-8">
           Have you ever wondered what actually happens inside your phone or computer? 
           We take you on a visual walkthrough from the screen you look at every day 
           right down to the tiny microscopic circuits that make it all work, explaining 
@@ -617,16 +617,16 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         }}
       >
         <div>
-          <div className={`${EYEBROW} text-[#8aa9ff] mb-2.5`}>
+          <div className="text-[9.5px] font-mono tracking-[0.12em] text-[#8aa9ff] mb-2 uppercase">
             Chapter {currentChapter.chapter}
           </div>
-          <h1 className="text-[28px] font-semibold leading-none tracking-tight text-white/92 mb-1.5">
+          <h1 className="text-[20px] font-medium tracking-tight text-white/90 mb-1">
             {currentChapter.title}
           </h1>
-          <div className="text-[12px] text-white/45 mb-3.5">
+          <div className="text-[11px] font-mono tracking-wider text-white/40 mb-3.5 uppercase">
             {currentChapter.subtitle}
           </div>
-          <p className="text-[12.5px] leading-[1.7] text-white/60 max-w-[340px]">
+          <p className="text-[12px] leading-[1.65] text-white/50 max-w-[320px]">
             {currentChapter.description}
           </p>
           {activeChapterLevel === 3 && (
