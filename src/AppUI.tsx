@@ -550,11 +550,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: "auto",
         }}
       >
-        <h1 className="text-[58px] font-semibold leading-[1.06] tracking-[-0.03em] text-white/95 mb-7 mt-8">
+        <h1 className="text-[38px] font-semibold leading-[1.15] tracking-tight text-white/95 mb-6 mt-8">
           What&apos;s really inside <br />
-          <span className="article-serif italic font-medium text-white/85">your processor.</span>
+          <span className="article-serif italic font-normal text-white/80">your processor.</span>
         </h1>
-        <p className="text-[15px] leading-[1.8] text-white/60 max-w-[460px] mb-10">
+        <p className="text-[13.5px] leading-[1.7] text-white/55 max-w-[420px] mb-8">
           Have you ever wondered what actually happens inside your phone or computer? 
           We take you on a visual walkthrough from the screen you look at every day 
           right down to the tiny microscopic circuits that make it all work, explaining 
@@ -597,27 +597,29 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: "none",
         }}
       >
-        <div className={`${EYEBROW} text-[#8aa9ff] mb-2.5`}>
-          Chapter {currentChapter.chapter}
+        <div>
+          <div className="text-[9.5px] font-mono tracking-[0.12em] text-[#8aa9ff] mb-2 uppercase">
+            Chapter {currentChapter.chapter}
+          </div>
+          <h1 className="text-[20px] font-medium tracking-tight text-white/90 mb-1">
+            {currentChapter.title}
+          </h1>
+          <div className="text-[11px] font-mono tracking-wider text-white/40 mb-3.5 uppercase">
+            {currentChapter.subtitle}
+          </div>
+          <p className="text-[12px] leading-[1.65] text-white/50 max-w-[320px]">
+            {currentChapter.description}
+          </p>
+          {targetLevel === 2 && (
+            <button
+              onClick={() => setShowPlayground(true)}
+              className="mt-5 flex items-center gap-2 rounded-lg bg-[#5b7cfa] hover:bg-[#6d8cfb] text-white font-medium text-[12px] px-5 py-2.5 transition-colors duration-200 cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
+            >
+              <span>Open the interactive die</span>
+              <span aria-hidden>&rarr;</span>
+            </button>
+          )}
         </div>
-        <h1 className="text-[28px] font-semibold leading-none tracking-tight text-white/92 mb-1.5">
-          {currentChapter.title}
-        </h1>
-        <div className="text-[12px] text-white/45 mb-3.5">
-          {currentChapter.subtitle}
-        </div>
-        <p className="text-[12.5px] leading-[1.7] text-white/60 max-w-[340px]">
-          {currentChapter.description}
-        </p>
-        {targetLevel === 2 && (
-          <button
-            onClick={() => setShowPlayground(true)}
-            className="mt-5 flex items-center gap-2 rounded-lg bg-[#5b7cfa] hover:bg-[#6d8cfb] text-white font-medium text-[12px] px-5 py-2.5 transition-colors duration-200 cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
-          >
-            <span>Open the interactive die</span>
-            <span aria-hidden>&rarr;</span>
-          </button>
-        )}
       </div>
       
       {/* ── Right: Detail panel (level 3 selected block) ── */}
