@@ -201,7 +201,7 @@ export function Scene({
       <EffectComposer multisampling={0}>
         <Bloom intensity={isMobile ? 0.35 : 0.55} luminanceThreshold={0.5} luminanceSmoothing={0.15} mipmapBlur={!isMobile} />
         <Vignette eskil={false} offset={0.18} darkness={0.65} />
-        {!isMobile && <SMAA />}
+        {isMobile ? <></> : <SMAA />}
       </EffectComposer>
     </>
   );

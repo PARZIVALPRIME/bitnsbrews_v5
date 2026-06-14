@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+/* ── Design Tokens ───────────────────────────────────────────────────────────
+   Editorial dark system. One interactive accent (silicon blue), one physical
+   metal tone (copper, reserved for 3D hardware), domain colors live in
+   soc/data.ts. Panels are solid — blur is reserved for full-screen modals. */
+:root {
+  --bg: #0b0d12;
+  --surface: #12151d;
+  --surface-overlay: rgba(15, 18, 26, 0.94);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  --text-primary: #f4f6fa;
+  --text-secondary: rgba(226, 232, 244, 0.66);
+  --text-muted: rgba(226, 232, 244, 0.42);
+
+  --accent: #8aa9ff;          /* interactive text/icons on dark */
+  --accent-strong: #5b7cfa;   /* fills, bars, active states */
+  --accent-soft: rgba(138, 169, 255, 0.12);
+  --copper: #c79a4e;          /* physical metal — 3D scene only */
+
+  --success: #5bd6a2;
+  --danger: #f26d6d;
+
+  /* Elevation — depth, not decoration */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 3px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-3: 0 2px 6px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+html,
+body {
+  margin: 0;
+  background-color: var(--bg);
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--text-primary);
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Article body typography — serif optimized for long-form reading */
+.article-serif {
+  font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Solid panel — replaces glassmorphism everywhere except modal scrims */
+.panel {
+  background: var(--surface-overlay);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+}
+
+/* minimal range slider */
+.soc-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-strong) 0%, rgba(255, 255, 255, 0.08) 100%);
+  outline: none;
+}
+
+.soc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: 2px solid var(--accent-strong);
+  cursor: pointer;
+}
+
+.soc-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: 2px solid var(--accent-strong);
+  cursor: pointer;
+}
+
+/* Custom minimal scrollbar for technical panels and global */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+html {
+  scrollbar-color: rgba(255, 255, 255, 0.15) var(--bg);
+}
+
+/* Newsletter success check */
+@keyframes checkmarkDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-checkmark {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: checkmarkDraw 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+/* Floating track cards on the Library page (3D-anchored HTML) */
+.track-card {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Boot screen progress line */
+@keyframes bootProgress {
+  0% {
+    transform: scaleX(0);
+  }
+  60% {
+    transform: scaleX(0.7);
+  }
+  100% {
+    transform: scaleX(0.96);
+  }
+}
+
+.boot-bar {
+  transform-origin: left;
+  animation: bootProgress 1.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

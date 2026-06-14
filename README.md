@@ -22,57 +22,72 @@ An interactive, immersive 3D semiconductor SoC (System-on-Chip) explorer. Walk t
 
 ## 🛠️ Technology Stack
 
-* **Frontend Framework:** React + TypeScript + Vite
-* **3D Library:** Three.js (via React Three Fiber & `@react-three/drei`)
-* **Styling:** Tailwind CSS + Custom CSS Variables
-* **Icons:** Lucide React
+* **Framework:** Next.js 15 (App Router) + React 19 + TypeScript
+* **3D Library:** Three.js (via React Three Fiber & `@react-three/drei`), loaded client-only
+* **Content:** MDX articles in `/content/articles` (frontmatter + embedded React visualizers)
+* **Styling:** Tailwind CSS v4 (via `@tailwindcss/postcss`) + custom CSS variables
+
+The immersive 3D experience is the landing page (`/`). Long-form articles are
+**real, statically-generated, SEO-indexable pages** under `/articles/<slug>`.
 
 ---
 
 ## 📂 Project Structure
 
 ```
-final-mark/
+bitsnbrews/
+├── app/                          # Next.js App Router
+│   ├── layout.tsx                # Root layout: fonts, global metadata
+│   ├── page.tsx                  # Home → loads the 3D experience (client-only)
+│   ├── globals.css               # Global styles + design tokens (Tailwind v4)
+│   ├── articles/
+│   │   ├── page.tsx              # Article index
+│   │   └── [slug]/page.tsx       # SSG article page (renders MDX + metadata + JSON-LD)
+│   ├── tracks/[track]/page.tsx   # Per-track landing pages
+│   ├── sitemap.ts / robots.ts    # SEO
+├── content/articles/*.mdx        # The articles themselves (prose + <Visualizers/>)
 ├── src/
-│   ├── soc/
-│   │   ├── BlockArticle.tsx      # Handles HTML article cards rendered on block tops
-│   │   ├── SocBlock.tsx          # Component for rendering individual 3D silicon blocks
-│   │   ├── Scene.tsx             # Coordinates the main 3D canvas assemblies
-│   │   ├── levelManager.ts       # Manages 3D camera paths, field of view, and interpolation
-│   │   ├── ProceduralModels.tsx  # Houses 3D models for Laptop, Substrate, and Pipelines
-│   │   └── data.ts               # Silicon block sizes, dimensions, colors, coordinates
-│   ├── chapters.ts               # Narrative definitions for the 10 explorer stages
-│   ├── AppUI.tsx                 # Main overlay UI layout (titles, buttons, scroll logic)
-│   ├── RootApp.tsx               # Orchestrator dividing desktop and mobile views
-│   └── main.tsx                  # Vite client entry point
+│   ├── ExperienceLoader.tsx      # Dynamically imports the 3D app with ssr:false
+│   ├── RootApp.tsx → AppUI.tsx   # The 3D experience UI (unchanged from the SPA)
+│   ├── soc/                      # 3D scene system (Scene, blocks, shaders, data…)
+│   ├── lib/articles.ts           # Reads MDX frontmatter + builds tables of contents
+│   ├── lib/site.ts               # Site URL/name — set your domain here
+│   └── components/
+│       ├── mdx/                  # Styled MDX elements + editorial blocks (Callout, Challenge…)
+│       ├── visualizers/          # Custom per-article interactive visualizers
+│       └── article/              # Reading progress bar + scrollspy TOC
 ```
+
+### Authoring a new article
+
+1. Add `content/articles/<slug>.mdx` with frontmatter (`title`, `description`,
+   `author`, `date`, `track`, `trackNo`, `readTime`, `published`).
+2. Write the prose in Markdown. Use editorial blocks like `<Challenge n={1}>…</Challenge>`
+   or `<Defs><Def term="…">…</Def></Defs>`.
+3. For a custom visual, build a component in `src/components/visualizers/`, register
+   it in `src/components/visualizers/index.ts`, then drop `<YourVisualizer />` into the MDX.
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-Make sure you have Node.js installed (v16+ recommended).
+Node.js v18.18+ (v20+ recommended).
 
-### Installation
-Clone the repository, navigate to the folder, and install dependencies:
+### Install & run
 ```bash
 npm install
+npm run dev        # http://localhost:3000
 ```
 
-### Run Locally
-Start the development server:
+### Build for production
 ```bash
-npm run dev
+npm run build      # type-checks + statically generates all pages into .next/
+npm run start      # serve the production build locally
 ```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### Build for Production
-Generate the production bundle:
-```bash
-npm run build
-```
-The optimized bundle will be created in the `dist/` directory.
+Deploys cleanly to **Vercel** (recommended) or any Next.js host. Set your real
+domain in `src/lib/site.ts` before going live.
 
 ---
 

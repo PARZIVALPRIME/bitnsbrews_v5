@@ -25,6 +25,7 @@ interface SceneProps {
   mode: "Idle";
   targetLevel: number;
   visMode: string;
+  uiTransitionRef?: React.MutableRefObject<{ onUpdate: (levelFloat: number) => void } | null>;
 }
 
 interface UiProps {
@@ -663,7 +664,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
               }}
               tabIndex={0}
             >
-              Open details for {block.label}
+              Open details for {block.name}
             </button>
           ))}
         </div>

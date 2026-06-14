@@ -138,7 +138,7 @@ function Segment({ seg }: { seg: ArticleSegment }) {
   }
 }
 
-import { ARTICLES, Article } from "./articles";
+import { ARTICLES } from "./articles";
 
 export function ArticleReader({ article, onClose, onNavigate }: { article: Article; onClose: () => void; onNavigate?: (id: string) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
