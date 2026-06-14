@@ -35,37 +35,7 @@ interface UiProps {
 // Shared label style: quiet uppercase eyebrow — used sparingly, one per section.
 const EYEBROW = "text-[10px] font-medium tracking-[0.12em] uppercase";
 
-function OverlayLoadingFallback({ variant = "fullscreen" }: { variant?: "fullscreen" | "search" }) {
-  if (variant === "search") {
-    return (
-      <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 backdrop-blur-md bg-black/40">
-        <div className="panel w-full max-w-2xl rounded-2xl border border-white/10 bg-[rgba(15,18,26,0.94)] shadow-2xl overflow-hidden">
-          <div className="flex items-center gap-4 px-6 py-4 border-b border-white/10">
-            <div className="h-5 w-5 rounded-full border border-[#8aa9ff]/50" />
-            <div className="h-4 flex-1 rounded-full bg-white/[0.06] overflow-hidden">
-              <div className="boot-bar h-full w-1/2 rounded-full bg-white/35" />
-            </div>
-          </div>
-          <div className="p-5 space-y-3">
-            <div className="h-3 w-1/2 rounded-full bg-white/[0.06]" />
-            <div className="h-3 w-2/3 rounded-full bg-white/[0.04]" />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0b0d12] text-white">
-      <div className="text-[16px] font-semibold tracking-[-0.01em] text-white/90 mb-8">
-        Bits&apos;nBrews
-      </div>
-      <div className="w-[160px] h-[2px] bg-white/10 relative overflow-hidden rounded-full">
-        <div className="boot-bar absolute inset-0 bg-white/70 rounded-full" />
-      </div>
-    </div>
-  );
-}
 
 export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop" }: UiProps) {
   // ── State ─────────────────────────────────────────────────────────────────
@@ -954,7 +924,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       </div>
 
       {showPlayground && (
-        <Suspense fallback={<OverlayLoadingFallback />}>
+        <Suspense fallback={null}>
           <LazyPlaygroundOverlay
             quality={perfMode === "high" ? "desktop" : "mobile"}
             onClose={() => setShowPlayground(false)}
@@ -963,7 +933,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       )}
 
       {activeTrackPageId && (
-        <Suspense fallback={<OverlayLoadingFallback />}>
+        <Suspense fallback={null}>
           <LazyTrackPage
             trackId={activeTrackPageId}
             onClose={() => setActiveTrackPageId(null)}
@@ -975,7 +945,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       )}
 
       {activeComponentPortal && (
-        <Suspense fallback={<OverlayLoadingFallback />}>
+        <Suspense fallback={null}>
           <LazyComponentPortal
             componentId={activeComponentPortal}
             onClose={() => {
@@ -994,7 +964,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         const article = getArticle(readerArticleId);
         if (!article) return null;
         return (
-          <Suspense fallback={<OverlayLoadingFallback />}>
+          <Suspense fallback={null}>
             <LazyArticleReader article={article} onClose={() => setReaderArticleId(null)} onNavigate={(id) => setReaderArticleId(id)} />
           </Suspense>
         );
@@ -1002,7 +972,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Global Search Palette ──────────────────────────────────────────── */}
       {isSearchOpen && (
-        <Suspense fallback={<OverlayLoadingFallback variant="search" />}>
+        <Suspense fallback={null}>
           <LazySearchPalette
             isOpen={isSearchOpen}
             onClose={() => setIsSearchOpen(false)}
