@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:single",
+    "build:single": "SINGLE_FILE=true vite build",
+    "build:split": "SINGLE_FILE=false vite build",
     "preview": "vite preview"
   },
   "dependencies": {
