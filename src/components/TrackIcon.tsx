@@ -13,6 +13,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "silicon-explained": // Microscope / Tech foundations
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -28,6 +29,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "die-chronicles": // Layout Grid / Silicon Die shot
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -43,6 +45,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "chip-lore": // Book / History
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -58,6 +61,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "code-to-core": // Code Terminal / Software-hardware map
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -73,6 +77,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "paper-lab": // Chemistry Flask / Academic Research
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -87,6 +92,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "the-tradeoff": // Balance Scales
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -102,6 +108,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "post-mortem": // Alert Triangle / Failures
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -118,6 +125,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "rtl-to-silicon": // CPU Chip Circuitry
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -134,6 +142,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     case "the-hard-question": // Help Circle / Question mark
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -150,6 +159,7 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
     default:
       return (
         <svg
+          aria-hidden="true"
           className={className}
           viewBox="0 0 24 24"
           fill="none"
@@ -165,3 +175,4 @@ export function TrackIcon({ id, className = "w-6 h-6", color = "currentColor" }:
       );
   }
 }
+

@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback, startTransition } from "react";
 import { Canvas } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import { QualityContext } from "./soc/quality";
@@ -95,8 +95,8 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
   const onUpdate = useCallback((levelFloat: number) => {
     // Parallax displacements (max 6px)
-    const mx = mouse.current.x * 6;
-    const my = mouse.current.y * 6;
+    const mx = 0; // mouse.current.x * 6;
+    const my = 0; // mouse.current.y * 6;
 
     // 1. Chapter 1 Hero Panel
     if (heroPanelRef.current) {
@@ -238,14 +238,16 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   // ── Snap-to-chapter scroll: wheel + keyboard ──────────────────────────────
   useEffect(() => {
     const advance = (dir: 1 | -1) => {
-      setTargetLevel((prev) => {
-        const next = Math.max(1, Math.min(TOTAL, prev + dir));
-        if (next !== prev) {
-          // Briefly hide chapter text so it fades back in for new chapter
-          setChapterVisible(false);
-          setTimeout(() => setChapterVisible(true), 320);
-        }
-        return next;
+      startTransition(() => {
+        setTargetLevel((prev) => {
+          const next = Math.max(1, Math.min(TOTAL, prev + dir));
+          if (next !== prev) {
+            // Briefly hide chapter text so it fades back in for new chapter
+            setChapterVisible(false);
+            setTimeout(() => setChapterVisible(true), 320);
+          }
+          return next;
+        });
       });
     };
 
@@ -457,17 +459,6 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
         {/* Global Controls Grid */}
         <div className="flex items-center gap-3 pointer-events-auto">
-          {showPerfPrompt && perfMode === "high" && (
-            <div className="absolute right-[calc(100%-240px)] top-[64px] flex items-center gap-2 bg-[#ff4a5a] text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap animate-fade-in z-30 border border-white/10">
-              <span>Lagging? Switch to Performance mode for a smoother look!</span>
-              <button 
-                onClick={() => setShowPerfPrompt(false)} 
-                className="hover:text-white/80 font-bold ml-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-          )}
 
           <button
             onClick={() => setIsSearchOpen(true)}
@@ -483,17 +474,30 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             </kbd>
           </button>
 
-          <button
-            onClick={() => {
-              const nextMode = perfMode === "high" ? "low" : "high";
-              setPerfMode(nextMode);
-              setAutoDowngraded(false);
-              setShowPerfPrompt(false);
-            }}
-            className="text-[10px] font-mono font-medium tracking-wider text-white/50 hover:text-white transition-colors duration-200 border border-white/8 hover:border-white/20 px-3.5 py-2 rounded-lg cursor-pointer bg-[#12151d]/90 shadow-sm"
-          >
-            {perfMode === "high" ? "QUALITY: HIGH" : "QUALITY: LITE"}
-          </button>
+          <div className="relative flex items-center">
+            {showPerfPrompt && perfMode === "high" && (
+              <div className="absolute top-[calc(100%+8px)] right-0 flex items-center gap-2 bg-[#ff4a5a] text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-[0_4px_12px_rgba(255,74,90,0.25)] whitespace-nowrap animate-fade-in z-30 border border-white/10 before:content-[''] before:absolute before:-top-1.5 before:right-6 before:border-x-[6px] before:border-x-transparent before:border-b-[6px] before:border-b-[#ff4a5a]">
+                <span>Lagging? Switch to Lite mode for a smoother look!</span>
+                <button 
+                  onClick={() => setShowPerfPrompt(false)} 
+                  className="hover:text-white/80 font-bold ml-1 cursor-pointer outline-none"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                const nextMode = perfMode === "high" ? "low" : "high";
+                setPerfMode(nextMode);
+                setAutoDowngraded(false);
+                setShowPerfPrompt(false);
+              }}
+              className="text-[10px] font-mono font-medium tracking-wider text-white/50 hover:text-white transition-colors duration-200 border border-white/8 hover:border-white/20 px-3.5 py-2 rounded-lg cursor-pointer bg-[#12151d]/90 shadow-sm"
+            >
+              {perfMode === "high" ? "QUALITY: HIGH" : "QUALITY: LITE"}
+            </button>
+          </div>
 
           <button
             onClick={() => setT((p) => (p === 0 ? 1 : 0))}

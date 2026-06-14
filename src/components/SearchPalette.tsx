@@ -62,6 +62,8 @@ export function SearchPalette({
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
+            id="search-input"
+            name="search"
             ref={inputRef}
             type="text"
             className="flex-1 bg-transparent border-none outline-none text-white px-4 text-[17px] placeholder-white/30"

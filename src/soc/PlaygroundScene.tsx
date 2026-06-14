@@ -3,6 +3,7 @@ import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessi
 import { BLOCKS, DIE_W, DIE_D, SocMode, UTILIZATION } from "./data";
 import { SocBlock } from "./PlaygroundBlock";
 import { TrafficNetwork } from "./Traffic";
+import { useQuality } from "./quality";
 
 function getUtil(id: string, mode: SocMode): number {
   const table = UTILIZATION[id];
@@ -142,6 +143,8 @@ export function Scene({
   setSelected: (id: string | null) => void;
   mode: SocMode;
 }) {
+  const isMobile = useQuality() === "mobile";
+
   return (
     <>
       <color attach="background" args={["#08090e"]} />
@@ -149,7 +152,7 @@ export function Scene({
 
       <Lights />
 
-      <Environment resolution={256}>
+      <Environment resolution={isMobile ? 128 : 256} frames={1}>
         <Lightformer intensity={1.4} color="#ffdca8" position={[-10, 8, 6]} scale={[10, 10, 1]} />
         <Lightformer intensity={0.6} color="#8aa0e0" position={[12, 6, -6]} scale={[8, 8, 1]} />
         <Lightformer intensity={0.8} color="#ffb878" position={[0, 5, -14]} scale={[12, 4, 1]} />
@@ -181,6 +184,7 @@ export function Scene({
         opacity={0.55}
         far={18}
         color="#000000"
+        frames={1}
       />
 
       <OrbitControls
@@ -195,9 +199,9 @@ export function Scene({
       />
 
       <EffectComposer multisampling={0}>
-        <Bloom intensity={0.55} luminanceThreshold={0.5} luminanceSmoothing={0.15} mipmapBlur />
+        <Bloom intensity={isMobile ? 0.35 : 0.55} luminanceThreshold={0.5} luminanceSmoothing={0.15} mipmapBlur={!isMobile} />
         <Vignette eskil={false} offset={0.18} darkness={0.65} />
-        <SMAA />
+        {!isMobile && <SMAA />}
       </EffectComposer>
     </>
   );

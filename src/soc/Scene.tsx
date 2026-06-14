@@ -680,7 +680,7 @@ export function Scene({
       <Lights visMode={visMode} levelFloat={levelFloat} />
 
       {!isMobile ? (
-        <Environment resolution={128}>
+        <Environment resolution={128} frames={1}>
           <Lightformer intensity={1.4} color="#ffdca8" position={[-10, 8, 6]} scale={[10, 10, 1]} />
           <Lightformer intensity={0.6} color="#8aa0e0" position={[12, 6, -6]} scale={[8, 8, 1]} />
           <Lightformer intensity={0.8} color="#ffb878" position={[0, 5, -14]} scale={[12, 4, 1]} />
