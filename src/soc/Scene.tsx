@@ -13,6 +13,7 @@ const MemoSocBlock = memo(SocBlock);
 import { getCameraParamsInterpolated } from "./levelManager";
 import { useQuality } from "./quality";
 import { PowerRailShader } from "./shaders";
+import { Particles } from "./Particles";
 import {
   ComputerCasing,
   PackageSubstrate,
@@ -451,12 +452,28 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
 function CameraController({
   levelFloat,
   selectedBlockCoords,
+  uiTransitionRef,
 }: {
   levelFloat: number;
   selectedBlockCoords: { cx: number; cz: number; h: number } | null;
+  uiTransitionRef?: React.MutableRefObject<{
+    onUpdate: (levelFloat: number) => void;
+  } | null>;
 }) {
   const { camera } = useThree();
   const targetRef = useRef(new THREE.Vector3(0, 1.5, 0));
+
+  const mouse = useRef(new THREE.Vector2(0, 0));
+  const parallax = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
 
   const targetParams = useMemo(
     () => getCameraParamsInterpolated(levelFloat, selectedBlockCoords),
@@ -466,24 +483,37 @@ function CameraController({
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
 
-    // Subtle micro-breathing drift only
-    const driftX = Math.sin(time * 0.4) * 0.06;
-    const driftY = Math.cos(time * 0.3) * 0.04;
-    const driftZ = Math.sin(time * 0.5) * 0.06;
+    // Subtle micro-breathing drift
+    const driftX = Math.sin(time * 0.35) * 0.08;
+    const driftY = Math.cos(time * 0.25) * 0.05;
+    const driftZ = Math.sin(time * 0.45) * 0.08;
+
+    // Mouse parallax offset (more intense when zoomed in at level >= 3)
+    const intensity = levelFloat <= 1.8 ? 1.5 : 2.8;
+    const targetPX = mouse.current.x * intensity;
+    const targetPY = mouse.current.y * intensity;
+    
+    // Smoothly ease the parallax values to prevent sudden jumps
+    parallax.current.x += (targetPX - parallax.current.x) * 0.04;
+    parallax.current.y += (targetPY - parallax.current.y) * 0.04;
 
     const finalPos = targetParams.position.clone().add(
-      new THREE.Vector3(driftX, driftY, driftZ)
+      new THREE.Vector3(driftX + parallax.current.x, driftY + parallax.current.y, driftZ)
     );
 
-    // Smooth lerp
-    camera.position.lerp(finalPos, 0.06);
-    targetRef.current.lerp(targetParams.target, 0.06);
+    // Heavy cinematic easing: lerp position and lookAt target at slightly different rates
+    camera.position.lerp(finalPos, 0.045);
+    targetRef.current.lerp(targetParams.target, 0.05);
     camera.lookAt(targetRef.current);
 
     const persCam = camera as THREE.PerspectiveCamera;
     if (persCam.isPerspectiveCamera) {
-      persCam.fov += (targetParams.fov - persCam.fov) * 0.06;
+      persCam.fov += (targetParams.fov - persCam.fov) * 0.05;
       persCam.updateProjectionMatrix();
+    }
+
+    if (uiTransitionRef && uiTransitionRef.current && uiTransitionRef.current.onUpdate) {
+      uiTransitionRef.current.onUpdate(levelFloat);
     }
   });
 
@@ -566,6 +596,9 @@ interface SceneProps {
   mode: SocMode;
   targetLevel: number;
   visMode?: string;
+  uiTransitionRef?: React.MutableRefObject<{
+    onUpdate: (levelFloat: number) => void;
+  } | null>;
 }
 
 function getStaggeredT(blockId: string, manualT: number): number {
@@ -591,6 +624,7 @@ export function Scene({
   mode,
   targetLevel,
   visMode = "physical",
+  uiTransitionRef,
 }: SceneProps) {
   const [levelFloat, setLevelFloat] = useState(targetLevel);
 
@@ -640,6 +674,9 @@ export function Scene({
       {/* Transparent canvas background allows HTML circuit traces to show behind the 3D casing */}
       <fog attach="fog" args={["#08090e", fogStart, fogEnd]} />
 
+      {/* GPU-accelerated atmospheric dust particles */}
+      <Particles count={isMobile ? 120 : 450} color="#c79a4e" levelFloat={levelFloat} />
+
       <Lights visMode={visMode} levelFloat={levelFloat} />
 
       {!isMobile ? (
@@ -651,7 +688,11 @@ export function Scene({
         </Environment>
       ) : null}
 
-      <CameraController levelFloat={levelFloat} selectedBlockCoords={selectedBlockCoords} />
+      <CameraController
+        levelFloat={levelFloat}
+        selectedBlockCoords={selectedBlockCoords}
+        uiTransitionRef={uiTransitionRef}
+      />
 
       <group onPointerMissed={() => setSelected(null)}>
         {/* Layer 1: Computer Shell (slides down & fades out) */}

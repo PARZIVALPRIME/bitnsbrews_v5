@@ -246,8 +246,8 @@ export function SocBlock({
             <meshStandardMaterial
               ref={bodyMat}
               color={block.color}
-              metalness={visMode === "logical" ? 0.95 : block.metalness}
-              roughness={visMode === "logical" ? 0.15 : block.roughness}
+              metalness={visMode === "logical" ? 0.95 : Math.min(0.92, block.metalness * 1.35)}
+              roughness={visMode === "logical" ? 0.15 : Math.max(0.18, block.roughness * 0.55)}
               transparent={visMode === "logical" || dimmed}
               opacity={(dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1) * opacity}
             />
@@ -274,8 +274,8 @@ export function SocBlock({
             <meshStandardMaterial
               ref={capMat}
               color={block.base}
-              metalness={visMode === "logical" ? 0.95 : block.metalness + 0.05}
-              roughness={visMode === "logical" ? 0.15 : Math.max(0.15, block.roughness - 0.08)}
+              metalness={visMode === "logical" ? 0.95 : Math.min(0.95, block.metalness * 1.45)}
+              roughness={visMode === "logical" ? 0.15 : Math.max(0.12, block.roughness * 0.45)}
               transparent={visMode === "logical" || dimmed}
               opacity={(dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1) * opacity}
             />

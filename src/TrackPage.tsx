@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { TRACKS, type Track } from "./trackArticles";
 import { ARTICLES, type Article } from "./articles";
 import { Footer } from "./components/Footer";
+import { TrackIcon } from "./components/TrackIcon";
 
 // Helper to filter and sort articles by date in chronological order (oldest first)
 function getArticlesForTrack(track: Track): Article[] {
@@ -90,7 +91,9 @@ export function TrackPage({ trackId, onClose, onReadArticle }: TrackPageProps) {
         {/* Track Header */}
         <header className="border-b border-white/8 pb-10">
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-3xl">{track.icon}</span>
+            <span className="text-[#8aa9ff]">
+              <TrackIcon id={track.id} className="w-8.5 h-8.5" color="#8aa9ff" />
+            </span>
             <span className="text-[11px] font-mono tracking-[0.12em] text-[#8aa9ff] uppercase font-bold">
               Active Track
             </span>

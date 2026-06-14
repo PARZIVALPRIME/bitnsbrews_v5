@@ -193,8 +193,8 @@ export function SocBlock({
           <meshStandardMaterial
             ref={bodyMat}
             color={block.color}
-            metalness={block.metalness}
-            roughness={block.roughness}
+            metalness={Math.min(0.92, block.metalness * 1.35)}
+            roughness={Math.max(0.18, block.roughness * 0.55)}
             transparent
             opacity={1}
           />
@@ -219,8 +219,8 @@ export function SocBlock({
           <meshStandardMaterial
             ref={capMat}
             color={block.base}
-            metalness={block.metalness + 0.05}
-            roughness={Math.max(0.15, block.roughness - 0.08)}
+            metalness={Math.min(0.95, block.metalness * 1.45)}
+            roughness={Math.max(0.12, block.roughness * 0.45)}
             transparent
             opacity={1}
           />

@@ -13,6 +13,7 @@ import { Footer } from "./components/Footer";
 import { SearchPalette } from "./components/SearchPalette";
 import { BLOCKS } from "./soc/data";
 import { ARTICLE_BLOCK_IDS } from "./articles";
+import { TrackIcon } from "./components/TrackIcon";
 
 import { PlaygroundOverlay } from "./soc/PlaygroundOverlay";
 
@@ -72,6 +73,82 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     const id = setTimeout(() => setBooted(true), 1400);
     return () => clearTimeout(id);
   }, []);
+
+  // ── HTML Panel Refs for Real-Time Canvas Synchronization ───────────────────
+  const heroPanelRef = useRef<HTMLDivElement>(null);
+  const chapterPanelRef = useRef<HTMLDivElement>(null);
+  const tracksMenuRef = useRef<HTMLDivElement>(null);
+  const detailPanelRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+
+  const uiTransitionRef = useRef<{ onUpdate: (levelFloat: number) => void } | null>(null);
+  const mouse = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
+  const onUpdate = useCallback((levelFloat: number) => {
+    // Parallax displacements (max 6px)
+    const mx = mouse.current.x * 6;
+    const my = mouse.current.y * 6;
+
+    // 1. Chapter 1 Hero Panel
+    if (heroPanelRef.current) {
+      const opacity = Math.max(0, 1 - Math.abs(levelFloat - 1) * 1.55);
+      const ty = (levelFloat - 1) * -35 + my;
+      heroPanelRef.current.style.opacity = `${opacity}`;
+      heroPanelRef.current.style.transform = `translate3d(${mx}px, ${ty}px, 0)`;
+      heroPanelRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
+    }
+
+    // 2. Chapters 2–4 Panel
+    if (chapterPanelRef.current) {
+      let opacity = 0;
+      if (levelFloat >= 1.7 && levelFloat <= 4.25) {
+        const fromCh1 = Math.min(1, (levelFloat - 1.7) * 4.5);
+        const toCh5 = Math.min(1, (4.25 - levelFloat) * 4.0);
+        opacity = Math.min(fromCh1, toCh5);
+      }
+      const ty = (Math.round(levelFloat) - levelFloat) * 20 + my;
+      chapterPanelRef.current.style.opacity = `${opacity}`;
+      chapterPanelRef.current.style.transform = `translate3d(${mx}px, ${ty}px, 0)`;
+      chapterPanelRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
+    }
+
+    // 3. Chapter 3 Tracks Menu
+    if (tracksMenuRef.current) {
+      const opacity = Math.max(0, 1 - Math.abs(levelFloat - 3) * 3.0);
+      const ty = (levelFloat - 3) * -25 + my;
+      tracksMenuRef.current.style.opacity = `${opacity}`;
+      tracksMenuRef.current.style.transform = `translate3d(${mx}px, ${ty}px, 0)`;
+      tracksMenuRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
+    }
+
+    // 4. Detail Panel
+    if (detailPanelRef.current) {
+      const opacity = Math.max(0, 1 - Math.abs(levelFloat - 3) * 3.0);
+      detailPanelRef.current.style.opacity = `${opacity}`;
+      detailPanelRef.current.style.transform = `translate3d(${mx}px, ${my}px, 0)`;
+      detailPanelRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
+    }
+
+    // 5. Progress Bar
+    if (progressBarRef.current) {
+      const opacity = Math.max(0, 1 - Math.max(0, levelFloat - 4) * 2.2);
+      progressBarRef.current.style.opacity = `${opacity}`;
+      progressBarRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
+    }
+  }, []);
+
+  useEffect(() => {
+    uiTransitionRef.current = { onUpdate };
+  }, [onUpdate]);
 
   // Auto-dismiss performance prompt after 8 seconds
   useEffect(() => {
@@ -339,6 +416,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                   mode="Idle"
                   targetLevel={targetLevel}
                   visMode={visMode}
+                  uiTransitionRef={uiTransitionRef}
                 />
               </Suspense>
             </PerformanceMonitor>
@@ -364,20 +442,23 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         }}
       />
 
-      {/* ── Top-left: Publication wordmark ───────────────────────────────── */}
-      <div className="absolute top-6 left-8 z-20">
-        <div className="flex items-baseline gap-2.5">
-          <span className="text-[15px] font-semibold tracking-[-0.01em] text-white/90">
+      {/* ── Top Header Bar ── */}
+      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-8 h-20 pointer-events-none select-none">
+        {/* Wordmark logo */}
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <div className="text-[13px] font-semibold tracking-[0.22em] text-white uppercase">
             Bits&apos;nBrews
+          </div>
+          <span className="h-4 w-px bg-white/12" />
+          <span className="text-[10px] font-mono tracking-wider text-white/40 uppercase">
+            Semiconductor Explorer
           </span>
         </div>
-      </div>
 
-      {/* ── Top-right: Explode & Performance toggles ──────────────────────── */}
-      <div className="absolute top-6 right-8 z-20 flex flex-col items-end gap-1.5">
-        <div className="flex items-center gap-2 relative">
+        {/* Global Controls Grid */}
+        <div className="flex items-center gap-3 pointer-events-auto">
           {showPerfPrompt && perfMode === "high" && (
-            <div className="absolute right-[calc(100%+12px)] top-1/2 -translate-y-1/2 flex items-center gap-2 bg-[#ff4a5a] text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap animate-fade-in z-30 border border-white/10">
+            <div className="absolute right-[calc(100%-240px)] top-[64px] flex items-center gap-2 bg-[#ff4a5a] text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap animate-fade-in z-30 border border-white/10">
               <span>Lagging? Switch to Performance mode for a smoother look!</span>
               <button 
                 onClick={() => setShowPerfPrompt(false)} 
@@ -390,15 +471,14 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
           <button
             onClick={() => setIsSearchOpen(true)}
-            className="flex items-center gap-2 text-[11px] font-medium text-white/55 hover:text-white/90 transition-colors duration-200 border border-white/12 hover:border-white/30 px-3 py-1.5 rounded-md cursor-pointer bg-[#12151d]/80"
+            className="flex items-center gap-2 text-[10px] font-mono font-medium tracking-wider text-white/50 hover:text-white transition-colors duration-200 border border-white/8 hover:border-white/20 px-3.5 py-2 rounded-lg cursor-pointer bg-[#12151d]/90 shadow-sm"
             title="Search Library (Cmd+K)"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            Search
-            <kbd className="hidden sm:inline-block border border-white/20 rounded-[4px] px-1.5 py-0.5 text-[9px] font-mono ml-1 text-white/40">
+            <span>SEARCH</span>
+            <kbd className="hidden sm:inline-block border border-white/20 rounded px-1.5 py-0.5 text-[9px] font-mono text-white/30 ml-1">
               ⌘K
             </kbd>
           </button>
@@ -410,34 +490,28 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
               setAutoDowngraded(false);
               setShowPerfPrompt(false);
             }}
-            className="text-[11px] font-medium text-white/55 hover:text-white/90 transition-colors duration-200 border border-white/12 hover:border-white/30 px-3 py-1.5 rounded-md cursor-pointer bg-[#12151d]/80"
-            title={perfMode === "high" ? "Switch to performance mode (lighter rendering)" : "Switch to high quality (bloom & antialiasing)"}
+            className="text-[10px] font-mono font-medium tracking-wider text-white/50 hover:text-white transition-colors duration-200 border border-white/8 hover:border-white/20 px-3.5 py-2 rounded-lg cursor-pointer bg-[#12151d]/90 shadow-sm"
           >
-            {perfMode === "high" ? "Quality: High" : "Quality: Performance"}
+            {perfMode === "high" ? "QUALITY: HIGH" : "QUALITY: LITE"}
           </button>
 
           <button
             onClick={() => setT((p) => (p === 0 ? 1 : 0))}
-            className="text-[11px] font-medium text-white/55 hover:text-white/90 transition-colors duration-200 border border-white/12 hover:border-white/30 px-3 py-1.5 rounded-md cursor-pointer bg-[#12151d]/80"
+            className="text-[10px] font-mono font-medium tracking-wider text-white/50 hover:text-white transition-colors duration-200 border border-white/8 hover:border-white/20 px-3.5 py-2 rounded-lg cursor-pointer bg-[#12151d]/90 shadow-sm"
           >
-            {t === 0 ? "Exploded view" : "Assemble"}
+            {t === 0 ? "EXPLODE" : "ASSEMBLE"}
           </button>
         </div>
-        {autoDowngraded && (
-          <span className="text-[10px] text-white/40 select-none">
-            Adjusted automatically for this device
-          </span>
-        )}
-      </div>
+      </header>
 
-      {/* ── Chapter 1: Editorial hero — always mounted, fades in/out ────────── */}
+      {/* ── Chapter 1: Editorial hero ────────── */}
       <div
-        className="absolute left-0 top-0 bottom-0 z-20 flex flex-col justify-center pl-16 pr-8 w-[52%]"
+        ref={heroPanelRef}
+        className="absolute left-0 top-0 bottom-0 z-20 flex flex-col justify-center pl-16 pr-8 w-[52%] will-change-transform"
         style={{
-          opacity: targetLevel === 1 && chapterVisible ? 1 : 0,
-          transform: targetLevel === 1 && chapterVisible ? "translateY(0)" : "translateY(14px)",
-          transition: "opacity 600ms ease, transform 600ms ease",
-          pointerEvents: targetLevel === 1 ? "auto" : "none",
+          opacity: 1,
+          transform: "translate3d(0, 0, 0)",
+          pointerEvents: "auto",
         }}
       >
         <h1 className="text-[58px] font-semibold leading-[1.06] tracking-[-0.03em] text-white/95 mb-7 mt-8">
@@ -477,14 +551,14 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         </div>
       </div>
 
-      {/* ── Chapters 2–4: Compact bottom-left — always mounted, fades in/out ── */}
+      {/* ── Chapters 2–4: Compact bottom-left ── */}
       <div
-        className="absolute left-8 bottom-12 z-20 w-[420px] text-left pointer-events-none"
+        ref={chapterPanelRef}
+        className="absolute left-8 bottom-12 z-20 w-[420px] text-left will-change-transform"
         style={{
-          opacity: targetLevel > 1 && targetLevel <= 4 && chapterVisible ? 1 : 0,
-          transform: targetLevel > 1 && targetLevel <= 4 && chapterVisible ? "translateY(0)" : "translateY(12px)",
-          transition: "opacity 500ms ease, transform 500ms ease",
-          pointerEvents: targetLevel > 1 && targetLevel <= 4 ? "auto" : "none",
+          opacity: 0,
+          transform: "translate3d(0, 20px, 0)",
+          pointerEvents: "none",
         }}
       >
         <div className={`${EYEBROW} text-[#8aa9ff] mb-2.5`}>
@@ -531,14 +605,12 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
         return (
           <div
-            className="panel absolute right-8 top-1/2 -translate-y-1/2 z-20 w-[320px] max-h-[65vh] overflow-y-auto rounded-xl p-5 scrollbar-thin"
+            ref={detailPanelRef}
+            className="panel absolute right-8 top-1/2 -translate-y-1/2 z-20 w-[320px] max-h-[65vh] overflow-y-auto rounded-xl p-5 scrollbar-thin will-change-transform"
             style={{
-              opacity: isVisible ? 1 : 0,
-              transform: isVisible
-                ? "translateY(-50%) translateX(0)"
-                : "translateY(-50%) translateX(16px)",
-              transition: "opacity 500ms ease, transform 500ms ease",
-              pointerEvents: isVisible ? "auto" : "none",
+              opacity: 0,
+              transform: "translate3d(0, -50%, 0)",
+              pointerEvents: "none",
             }}
           >
             <div className="flex justify-between items-center mb-2">
@@ -624,12 +696,12 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Chapter 3: Technical Tracks Menu ───────────────────────────────── */}
       <div
-        className="panel absolute top-[110px] left-8 z-20 w-[340px] rounded-xl p-5 text-left flex flex-col max-h-[calc(100vh-410px)]"
+        ref={tracksMenuRef}
+        className="panel absolute top-[110px] left-8 z-20 w-[340px] rounded-xl p-5 text-left flex flex-col max-h-[calc(100vh-410px)] will-change-transform"
         style={{
-          opacity: targetLevel === 3 && chapterVisible ? 1 : 0,
-          transform: targetLevel === 3 && chapterVisible ? "translateY(0)" : "translateY(-12px)",
-          pointerEvents: targetLevel === 3 ? "auto" : "none",
-          transition: "opacity 500ms ease, transform 500ms ease",
+          opacity: 0,
+          transform: "translate3d(0, -12px, 0)",
+          pointerEvents: "none",
         }}
       >
         <div className={`${EYEBROW} text-[#8aa9ff] mb-4`}>
@@ -767,8 +839,8 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                     
                     <div className="p-6 sm:p-7 flex flex-col h-full relative z-10">
                       <div className="flex items-start justify-between mb-4">
-                        <span className="text-3xl filter drop-shadow-sm group-hover:scale-110 transition-transform duration-300 origin-bottom-left">
-                          {track.icon}
+                        <span className="text-[#8aa9ff] group-hover:scale-110 transition-transform duration-300 origin-bottom-left">
+                          <TrackIcon id={track.id} className="w-8 h-8" color="#8aa9ff" />
                         </span>
                         <span className="text-[11px] font-mono font-medium text-white/30 group-hover:text-[#8aa9ff] transition-colors tracking-widest">
                           NO. {numStr}
@@ -811,10 +883,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Bottom: progress bar + scroll hint ───────────────────────────── */}
       <div 
-        className="absolute bottom-6 left-8 right-8 z-20 flex items-center gap-4 transition-all duration-500"
+        ref={progressBarRef}
+        className="absolute bottom-6 left-8 right-8 z-20 flex items-center gap-4 will-change-transform"
         style={{
-          opacity: targetLevel === 5 ? 0 : 1,
-          pointerEvents: targetLevel === 5 ? "none" : "auto",
+          opacity: 1,
+          pointerEvents: "auto",
         }}
       >
         {/* Progress bar */}
