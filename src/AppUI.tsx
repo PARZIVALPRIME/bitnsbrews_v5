@@ -104,6 +104,8 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   const tracksMenuRef = useRef<HTMLDivElement>(null);
   const detailPanelRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const vignetteLeftRef = useRef<HTMLDivElement>(null);
+  const vignetteRadialRef = useRef<HTMLDivElement>(null);
 
   const uiTransitionRef = useRef<{ onUpdate: (levelFloat: number) => void } | null>(null);
   const mouse = useRef({ x: 0, y: 0 });
@@ -123,27 +125,46 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     const my = mouse.current.y * 6;
     const playgroundActive = showPlaygroundRef.current;
 
-    // 1. Chapter 1 Hero Panel
+    // smoothstep — softens the linear opacity ramps so panels ease in/out
+    // instead of crossing at a constant rate (avoids the "blink" feel).
+    const smooth = (x: number) => {
+      const c = Math.max(0, Math.min(1, x));
+      return c * c * (3 - 2 * c);
+    };
+
+    // 1. Chapter 1 Hero Panel — recedes into depth as the camera dives to the die
     if (heroPanelRef.current) {
-      const opacity = Math.max(0, 1 - Math.abs(levelFloat - 1) * 1.55);
-      const ty = (levelFloat - 1) * -35 + my;
+      const opacity = smooth(1 - Math.abs(levelFloat - 1) * 1.7);
+      const ty = (levelFloat - 1) * -46 + my;
+      const scale = 1 - (1 - opacity) * 0.05;
       heroPanelRef.current.style.opacity = `${opacity}`;
-      heroPanelRef.current.style.transform = `translate3d(${mx}px, ${ty}px, 0)`;
+      heroPanelRef.current.style.transform = `translate3d(${mx}px, ${ty}px, 0) scale(${scale})`;
       heroPanelRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
     }
 
-    // 2. Chapters 2–4 Panel
+    // 2. Chapters 2–4 Panel — rises into place, picking up where the hero left off
     if (chapterPanelRef.current) {
       let opacity = 0;
-      if (!playgroundActive && levelFloat >= 1.7 && levelFloat <= 4.25) {
-        const fromCh1 = Math.min(1, (levelFloat - 1.7) * 4.5);
-        const toCh5 = Math.min(1, (4.25 - levelFloat) * 4.0);
-        opacity = Math.min(fromCh1, toCh5);
+      if (!playgroundActive && levelFloat >= 1.5 && levelFloat <= 4.3) {
+        const fromCh1 = (levelFloat - 1.5) * 3.0;
+        const toEnd = (4.3 - levelFloat) * 3.2;
+        opacity = smooth(Math.min(fromCh1, toEnd));
       }
-      const ty = (Math.round(levelFloat) - levelFloat) * 20 + my;
+      // settle from a touch below as it fades in, plus a per-chapter rise
+      const rise = (Math.round(levelFloat) - levelFloat) * 26;
+      const ty = rise + (1 - opacity) * 12 + my;
       chapterPanelRef.current.style.opacity = `${opacity}`;
       chapterPanelRef.current.style.transform = `translate3d(${mx}px, ${ty}px, 0)`;
       chapterPanelRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
+    }
+
+    // 2b. Scroll-synced vignette — the framing light tracks the camera dive in
+    // real time instead of snapping on a discrete chapter boolean.
+    if (vignetteLeftRef.current) {
+      vignetteLeftRef.current.style.opacity = `${smooth(1 - (levelFloat - 1) * 2.2)}`;
+    }
+    if (vignetteRadialRef.current) {
+      vignetteRadialRef.current.style.opacity = `${smooth((levelFloat - 1) * 2.0)}`;
     }
 
     // 3. Chapter 3 Tracks Menu
@@ -454,21 +475,22 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         </Canvas>
       </div>
 
-      {/* ── Vignette: two layers that cross-fade between ch1 and ch2+ ───── */}
+      {/* ── Vignette: two layers, driven per-frame from levelFloat so the
+           framing light dives with the camera (see onUpdate §2b) ───── */}
       <div
-        className="pointer-events-none absolute inset-0 z-10"
+        ref={vignetteLeftRef}
+        className="pointer-events-none absolute inset-0 z-10 will-change-[opacity]"
         style={{
           background: "linear-gradient(to right, rgba(11,13,18,0.95) 0%, rgba(11,13,18,0.85) 30%, transparent 60%)",
-          opacity: targetLevel === 1 ? 1 : 0,
-          transition: "opacity 700ms ease",
+          opacity: 1,
         }}
       />
       <div
-        className="pointer-events-none absolute inset-0 z-10"
+        ref={vignetteRadialRef}
+        className="pointer-events-none absolute inset-0 z-10 will-change-[opacity]"
         style={{
           background: "radial-gradient(ellipse at center, transparent 30%, rgba(11,13,18,0.5))",
-          opacity: targetLevel === 1 ? 0 : 1,
-          transition: "opacity 700ms ease",
+          opacity: 0,
         }}
       />
 
@@ -540,6 +562,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         style={{
           opacity: 1,
           transform: "translate3d(0, 0, 0)",
+          transformOrigin: "left center",
           pointerEvents: "auto",
         }}
       >

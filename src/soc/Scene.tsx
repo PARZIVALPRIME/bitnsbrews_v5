@@ -541,14 +541,14 @@ function CameraController({
     const upVector = new THREE.Vector3(0, 1, 0).applyAxisAngle(forward, targetParams.roll || 0);
     camera.up.copy(upVector);
 
-    // Slower cinematic easing for a gorgeous, smooth glide
-    camera.position.lerp(finalPos, 0.065);
-    targetRef.current.lerp(targetParams.target, 0.065);
+    // Ultra-slow cinematic easing for a luxurious, sweeping glide
+    camera.position.lerp(finalPos, 0.04);
+    targetRef.current.lerp(targetParams.target, 0.04);
     camera.lookAt(targetRef.current);
 
     const persCam = camera as THREE.PerspectiveCamera;
     if (persCam.isPerspectiveCamera) {
-      persCam.fov += (targetParams.fov - persCam.fov) * 0.065;
+      persCam.fov += (targetParams.fov - persCam.fov) * 0.035;
       persCam.updateProjectionMatrix();
     }
   });
@@ -698,8 +698,8 @@ export function Scene({
     current: targetLevel,
     target: targetLevel,
     velocity: 0,
-    stiffness: 85, // Stiffness of the spring
-    damping: 18,   // Damping friction
+    stiffness: 45, // Low stiffness for slow cinematic transition
+    damping: 12,   // Gentle damping for smooth deceleration
   });
 
   const chipGroupRef = useRef<THREE.Group>(null!);

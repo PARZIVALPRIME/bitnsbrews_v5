@@ -120,7 +120,10 @@ export function getCameraParamsInterpolated(
 ): { position: THREE.Vector3; target: THREE.Vector3; fov: number; roll: number } {
   const baseLevel = Math.floor(levelFloat);
   const targetLevel = Math.min(ZOOM_LEVELS.length, baseLevel + 1);
-  const alpha = levelFloat - baseLevel;
+  const rawAlpha = levelFloat - baseLevel;
+
+  // Apply slow-in/slow-out easing (smoothstep) for cinematic acceleration
+  const alpha = rawAlpha * rawAlpha * (3 - 2 * rawAlpha);
 
   // Retrieve focused coords specific to base and target levels to prevent coordinate jumps during transitions
   const baseFocusCoords = selectedBlockCoords || getFocusedBlockCoordsForLevel(baseLevel);
@@ -140,8 +143,9 @@ export function getCameraParamsInterpolated(
   let twistAngle = 0;
   let roll = 0;
   if (baseLevel === 1 && targetLevel === 2) {
-    twistAngle = Math.sin(alpha * Math.PI) * 0.45;
-    roll = -Math.sin(alpha * Math.PI) * 0.15; // flight-sim camera bank/roll
+    // Wide sweeping orbital arc — the camera traces a dramatic helix as it dives in
+    twistAngle = Math.sin(alpha * Math.PI) * 0.7;
+    roll = -Math.sin(alpha * Math.PI) * 0.22; // deep cinematic camera bank/roll
   }
 
   // Interpolate camera relative coordinates spherically to pivot around the focus point
@@ -150,7 +154,9 @@ export function getCameraParamsInterpolated(
 
   // Cinematic Flyover Arc: Add a vertical lift proportional to distance to create a dynamic flyby swoop
   const dist = baseParams.position.distanceTo(targetParams.position);
-  const flyover = Math.sin(alpha * Math.PI) * (dist * 0.14);
+  // Chapter 1→2 gets a bigger arc for dramatic reveal; others stay subtle
+  const arcScale = (baseLevel === 1 && targetLevel === 2) ? 0.22 : 0.14;
+  const flyover = Math.sin(alpha * Math.PI) * (dist * arcScale);
   position.y += flyover;
 
   // Linear interpolation for field of view (FOV)

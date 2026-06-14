@@ -27,15 +27,18 @@ export function ComputerCasing() {
   useFrame(() => {
     if (!groupRef.current) return;
     const levelFloat = globalLevelState.current;
-    if (levelFloat > 2.0) {
+    if (levelFloat > 2.2) {
       groupRef.current.visible = false;
       return;
     }
     groupRef.current.visible = true;
 
     const progress = Math.max(0, Math.min(1, levelFloat - 1.0));
-    const yOffset = -2 - progress * 13;
-    const opacityMultiplier = Math.max(0, 1 - progress * 1.6);
+    // Cubic ease-out for graceful departure: fast at first, then slows
+    const easedProgress = 1 - Math.pow(1 - progress, 3);
+    const yOffset = -2 - easedProgress * 16;
+    // Softer opacity fade — lingers longer before disappearing
+    const opacityMultiplier = Math.max(0, 1 - progress * 1.3);
 
     groupRef.current.position.y = yOffset;
 

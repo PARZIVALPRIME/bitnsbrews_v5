@@ -127,8 +127,12 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
     setEntered(false);
     setTimeout(() => {
       onClose();
-    }, 450); // Matches transition duration
+    }, 300); // exit is quicker than enter — feels responsive
   };
+
+  // Shared motion curve — same expo ease the rest of the app uses.
+  const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
+  const open = entered && !closing;
 
   useEffect(() => {
     // A slightly longer timeout guarantees the browser registers the mounting state
@@ -152,22 +156,43 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0d12]/80 backdrop-blur-md transition-opacity duration-500 ease-in-out p-4 sm:p-8"
-      style={{ opacity: entered && !closing ? 1 : 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0d12]/80 backdrop-blur-md p-4 sm:p-8"
+      style={{
+        opacity: open ? 1 : 0,
+        transitionProperty: "opacity",
+        transitionDuration: closing ? "260ms" : "340ms",
+        transitionTimingFunction: "ease-out",
+      }}
       onClick={handleClose}
     >
       {/* Main panel */}
       <div
-        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_4px_12px_rgba(0,0,0,0.5),0_32px_80px_rgba(0,0,0,0.6)] flex flex-col gap-8 scrollbar-thin transition-all duration-500"
+        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_4px_12px_rgba(0,0,0,0.5),0_32px_80px_rgba(0,0,0,0.6)] flex flex-col gap-8 scrollbar-thin"
         style={{
-          opacity: entered && !closing ? 1 : 0,
-          transform: entered && !closing ? "scale(1) translate3d(0, 0, 0)" : "scale(0.95) translate3d(0, 16px, 0)",
-          transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)"
+          opacity: open ? 1 : 0,
+          transform: open
+            ? "scale(1) translate3d(0, 0, 0)"
+            : closing
+              ? "scale(0.97) translate3d(0, 10px, 0)"
+              : "scale(0.96) translate3d(0, 14px, 0)",
+          transitionProperty: "opacity, transform",
+          transitionDuration: closing ? "300ms" : "460ms",
+          transitionTimingFunction: EASE,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-white/8 pb-6">
+        {/* Header — leads the staggered content reveal */}
+        <div
+          className="flex items-start justify-between border-b border-white/8 pb-6"
+          style={{
+            opacity: open ? 1 : 0,
+            transform: open ? "translate3d(0, 0, 0)" : "translate3d(0, 8px, 0)",
+            transitionProperty: "opacity, transform",
+            transitionDuration: "420ms",
+            transitionTimingFunction: EASE,
+            transitionDelay: open ? "90ms" : "0ms",
+          }}
+        >
           <div className="flex items-center gap-4">
             <span
               className="flex items-center justify-center w-14 h-14 rounded-xl border shrink-0"
@@ -200,7 +225,17 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
         </div>
 
         {/* Content */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 text-left">
+        <div
+          className="grid grid-cols-1 md:grid-cols-12 gap-8 text-left"
+          style={{
+            opacity: open ? 1 : 0,
+            transform: open ? "translate3d(0, 0, 0)" : "translate3d(0, 10px, 0)",
+            transitionProperty: "opacity, transform",
+            transitionDuration: "460ms",
+            transitionTimingFunction: EASE,
+            transitionDelay: open ? "150ms" : "0ms",
+          }}
+        >
 
           {/* Left column — specs + textbook gap */}
           <div className="md:col-span-5 flex flex-col gap-5">
