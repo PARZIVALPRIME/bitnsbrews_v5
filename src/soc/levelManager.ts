@@ -1,5 +1,10 @@
 import * as THREE from "three";
 
+export const globalLevelState = {
+  current: 1.0,
+  target: 1.0,
+};
+
 export interface ZoomLevel {
   id: number;
   name: string;
@@ -22,15 +27,6 @@ export const ZOOM_LEVELS: ZoomLevel[] = [
   },
   {
     id: 2,
-    name: "MCM Package",
-    subtitle: "Silicon Substrate Layer",
-    description: "The Multi-Chip Module (MCM) packaging. Features an organic substrate, high-density interposer micro-bumps, and a copper heat spreader matching thermal expansion coefficients.",
-    defaultPosition: [0, 32, 38],
-    defaultTarget: [0, -1, 0],
-    fov: 28,
-  },
-  {
-    id: 3,
     name: "Silicon Die",
     subtitle: "3nm SoC Floorplan",
     description: "The monolithic semiconductor die. Spanning 22x18 units, containing ~12 Billion transistors constructed with EUV photolithography on a 3nm FinFET/GAA process node.",
@@ -39,7 +35,7 @@ export const ZOOM_LEVELS: ZoomLevel[] = [
     fov: 25,
   },
   {
-    id: 4,
+    id: 3,
     name: "The Library",
     subtitle: "Knowledge Map",
     description: "The die as a table of contents. Every block rises, and each main block carries one editorial track. Click a block to read.",
@@ -48,7 +44,7 @@ export const ZOOM_LEVELS: ZoomLevel[] = [
     fov: 32,
   },
   {
-    id: 5,
+    id: 4,
     name: "The Hub",
     subtitle: "Complete Index Directory",
     description: "",
@@ -60,14 +56,23 @@ export const ZOOM_LEVELS: ZoomLevel[] = [
 
 export function getCameraParamsForLevel(
   level: number,
-  _selectedBlockCoords: { cx: number; cz: number; h: number } | null
+  selectedBlockCoords: { cx: number; cz: number; h: number } | null
 ): { position: THREE.Vector3; target: THREE.Vector3; fov: number } {
-  const current = ZOOM_LEVELS.find((l) => l.id === level) || ZOOM_LEVELS[2];
+  const current = ZOOM_LEVELS.find((l) => l.id === level) || ZOOM_LEVELS[1];
   const position = new THREE.Vector3(...current.defaultPosition);
   const target = new THREE.Vector3(...current.defaultTarget);
   let fov = current.fov;
 
-
+  if (selectedBlockCoords && level === 3) {
+    target.set(selectedBlockCoords.cx, selectedBlockCoords.h + 0.2, selectedBlockCoords.cz);
+    // Position the camera tightly close to the block, maintaining a front-right-above perspective
+    position.set(
+      selectedBlockCoords.cx + 2.0,
+      selectedBlockCoords.h + 9.0,
+      selectedBlockCoords.cz + 13.0
+    );
+    fov = 20; // tighter cinematic view
+  }
 
   return { position, target, fov };
 }
@@ -76,7 +81,7 @@ export function getFocusedBlockCoordsForLevel(_level: number): { cx: number; cz:
   return null;
 }
 
-function interpolateSpherical(v1: THREE.Vector3, v2: THREE.Vector3, alpha: number): THREE.Vector3 {
+function interpolateSpherical(v1: THREE.Vector3, v2: THREE.Vector3, alpha: number, twistAngle: number = 0): THREE.Vector3 {
   const r1 = v1.length();
   const r2 = v2.length();
   
@@ -95,10 +100,10 @@ function interpolateSpherical(v1: THREE.Vector3, v2: THREE.Vector3, alpha: numbe
   // Interpolate polar angle
   const theta = theta1 + (theta2 - theta1) * alpha;
   
-  // Interpolate azimuthal angle using the shortest path angular transition
+  // Interpolate azimuthal angle using the shortest path angular transition + helical twist
   let diff = phi2 - phi1;
   diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-  const phi = phi1 + diff * alpha;
+  const phi = phi1 + diff * alpha + twistAngle;
   
   // Convert spherical coords back to Cartesian Vector3
   const sinTheta = Math.sin(theta);
@@ -112,7 +117,7 @@ function interpolateSpherical(v1: THREE.Vector3, v2: THREE.Vector3, alpha: numbe
 export function getCameraParamsInterpolated(
   levelFloat: number,
   selectedBlockCoords: { cx: number; cz: number; h: number } | null
-): { position: THREE.Vector3; target: THREE.Vector3; fov: number } {
+): { position: THREE.Vector3; target: THREE.Vector3; fov: number; roll: number } {
   const baseLevel = Math.floor(levelFloat);
   const targetLevel = Math.min(ZOOM_LEVELS.length, baseLevel + 1);
   const alpha = levelFloat - baseLevel;
@@ -131,8 +136,16 @@ export function getCameraParamsInterpolated(
   const relP1 = baseParams.position.clone().sub(target);
   const relP2 = targetParams.position.clone().sub(target);
 
+  // Add lateral helical / orbital swing on Chapter 1 -> 2 transition (System Casing -> Silicon Die)
+  let twistAngle = 0;
+  let roll = 0;
+  if (baseLevel === 1 && targetLevel === 2) {
+    twistAngle = Math.sin(alpha * Math.PI) * 0.45;
+    roll = -Math.sin(alpha * Math.PI) * 0.15; // flight-sim camera bank/roll
+  }
+
   // Interpolate camera relative coordinates spherically to pivot around the focus point
-  const relPos = interpolateSpherical(relP1, relP2, alpha);
+  const relPos = interpolateSpherical(relP1, relP2, alpha, twistAngle);
   const position = target.clone().add(relPos);
 
   // Cinematic Flyover Arc: Add a vertical lift proportional to distance to create a dynamic flyby swoop
@@ -143,5 +156,5 @@ export function getCameraParamsInterpolated(
   // Linear interpolation for field of view (FOV)
   const fov = baseParams.fov + (targetParams.fov - baseParams.fov) * alpha;
 
-  return { position, target, fov };
+  return { position, target, fov, roll };
 }

@@ -65,13 +65,14 @@ const ParticleShader = {
   `
 };
 
+import { globalLevelState } from "./levelManager";
+
 interface ParticlesProps {
   count?: number;
   color?: string;
-  levelFloat: number;
 }
 
-export function Particles({ count = 400, color = "#c79a4e", levelFloat }: ParticlesProps) {
+export function Particles({ count = 400, color = "#c79a4e" }: ParticlesProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
   const matRef = useRef<THREE.ShaderMaterial>(null!);
   const { camera } = useThree();
@@ -107,16 +108,20 @@ export function Particles({ count = 400, color = "#c79a4e", levelFloat }: Partic
 
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
+    const levelFloat = globalLevelState.current;
+    
+    // Fade out particles when zooming deep inside Level 4 (The Hub) to keep overlays readable
+    const opacityMultiplier = Math.max(0, 1.0 - Math.max(0, levelFloat - 3.2) * 1.25);
+    
     if (matRef.current) {
       matRef.current.uniforms.uTime.value = time;
       matRef.current.uniforms.uCameraPos.value.copy(camera.position);
+      matRef.current.opacity = opacityMultiplier;
+    }
+    if (meshRef.current) {
+      meshRef.current.visible = opacityMultiplier > 0.001;
     }
   });
-
-  // Fade out particles when zooming deep inside Level 5 (The Hub) to keep overlays readable
-  const opacityMultiplier = Math.max(0, 1.0 - Math.max(0, levelFloat - 4.2) * 1.25);
-
-  if (opacityMultiplier <= 0.001) return null;
 
   return (
     <instancedMesh ref={meshRef} args={[null as any, null as any, count]} frustumCulled={false}>

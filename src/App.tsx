@@ -73,7 +73,7 @@ export default function App() {
         className="absolute inset-0"
       >
         <Suspense fallback={null}>
-          <Scene t={t} showLabels={showLabels} selected={selected} setSelected={setSelected} mode={mode} targetLevel={3} />
+          <Scene t={t} selected={selected} setSelected={setSelected} mode={mode} targetLevel={3} />
           <CameraController cameraRef={cameraRef} />
         </Suspense>
       </Canvas>

@@ -3,6 +3,7 @@ import { useRef, useMemo, useLayoutEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Edges } from "@react-three/drei";
 import { TransistorFlowShader } from "./shaders";
+import { globalLevelState } from "./levelManager";
 
 const AMBER = "#c79a4e";
 const STEEL = "#5e6977";
@@ -14,53 +15,78 @@ function metalMat(color: string, roughness = 0.3, metalness = 0.9) {
 /* =========================================================================
    1. COMPUTER CASING (Level 1)
    ========================================================================= */
-export function ComputerCasing({ levelFloat }: { levelFloat: number }) {
-  if (levelFloat > 2.0) return null;
+export function ComputerCasing() {
+  const groupRef = useRef<THREE.Group>(null!);
+  const matRef = useRef<THREE.MeshStandardMaterial>(null!);
+  const edgeMatRef = useRef<THREE.LineBasicMaterial>(null!);
+  const wellMatRef = useRef<THREE.MeshStandardMaterial>(null!);
+  const wellEdgeMatRef = useRef<THREE.LineBasicMaterial>(null!);
+  const padMatRef = useRef<THREE.MeshStandardMaterial>(null!);
+  const padEdgeMatRef = useRef<THREE.LineBasicMaterial>(null!);
 
-  const progress = Math.max(0, Math.min(1, levelFloat - 1.0));
-  const yOffset = -2 - progress * 13;
-  const opacityMultiplier = Math.max(0, 1 - progress * 1.6); // Fades out earlier for a clean look
+  useFrame(() => {
+    if (!groupRef.current) return;
+    const levelFloat = globalLevelState.current;
+    if (levelFloat > 2.0) {
+      groupRef.current.visible = false;
+      return;
+    }
+    groupRef.current.visible = true;
+
+    const progress = Math.max(0, Math.min(1, levelFloat - 1.0));
+    const yOffset = -2 - progress * 13;
+    const opacityMultiplier = Math.max(0, 1 - progress * 1.6);
+
+    groupRef.current.position.y = yOffset;
+
+    if (matRef.current) matRef.current.opacity = 0.65 * opacityMultiplier;
+    if (edgeMatRef.current) edgeMatRef.current.opacity = 0.4 * opacityMultiplier;
+    if (wellMatRef.current) wellMatRef.current.opacity = opacityMultiplier;
+    if (wellEdgeMatRef.current) wellEdgeMatRef.current.opacity = 0.25 * opacityMultiplier;
+    if (padMatRef.current) padMatRef.current.opacity = opacityMultiplier;
+    if (padEdgeMatRef.current) padEdgeMatRef.current.opacity = 0.15 * opacityMultiplier;
+  });
 
   return (
-    <group position={[0, yOffset, 0]}>
+    <group ref={groupRef} position={[0, -2, 0]}>
       {/* Laptop Bottom Shell */}
       <mesh receiveShadow>
         <boxGeometry args={[44, 1.2, 38]} />
         <meshStandardMaterial 
+          ref={matRef}
           {...metalMat("#1a1c24", 0.35, 0.85)} 
           transparent 
-          opacity={0.65 * opacityMultiplier} 
         />
         <Edges threshold={15}>
-          <lineBasicMaterial color={STEEL} transparent opacity={0.4 * opacityMultiplier} />
+          <lineBasicMaterial ref={edgeMatRef} color={STEEL} transparent />
         </Edges>
       </mesh>
       {/* Keyboard Well Outline */}
       <mesh position={[0, 0.61, -3]}>
         <boxGeometry args={[34, 0.02, 16]} />
         <meshStandardMaterial 
+          ref={wellMatRef}
           color="#0c0d12" 
           roughness={0.65} 
           metalness={0.15} 
           transparent
-          opacity={opacityMultiplier}
         />
         <Edges threshold={15}>
-          <lineBasicMaterial color={AMBER} transparent opacity={0.25 * opacityMultiplier} />
+          <lineBasicMaterial ref={wellEdgeMatRef} color={AMBER} transparent />
         </Edges>
       </mesh>
       {/* Trackpad Outline */}
       <mesh position={[0, 0.61, 10]}>
         <boxGeometry args={[10, 0.02, 6]} />
         <meshStandardMaterial 
+          ref={padMatRef}
           color="#1f222c" 
           roughness={0.5} 
           metalness={0.6} 
           transparent
-          opacity={opacityMultiplier}
         />
         <Edges threshold={15}>
-          <lineBasicMaterial color={AMBER} transparent opacity={0.15 * opacityMultiplier} />
+          <lineBasicMaterial ref={padEdgeMatRef} color={AMBER} transparent />
         </Edges>
       </mesh>
     </group>

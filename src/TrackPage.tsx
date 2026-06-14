@@ -36,12 +36,21 @@ interface TrackPageProps {
 
 export function TrackPage({ trackId, onClose, onReadArticle }: TrackPageProps) {
   const [entered, setEntered] = useState(false);
+  const [closing, setClosing] = useState(false);
   const track = TRACKS.find((t) => t.id === trackId);
+
+  const handleClose = () => {
+    setClosing(true);
+    setEntered(false);
+    setTimeout(() => {
+      onClose();
+    }, 450); // Matches transition duration
+  };
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setEntered(true));
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -58,7 +67,7 @@ export function TrackPage({ trackId, onClose, onReadArticle }: TrackPageProps) {
     <div
       className="fixed inset-0 z-50 bg-[#0b0d12] overflow-y-auto scrollbar-thin select-none flex flex-col"
       style={{
-        opacity: entered ? 1 : 0,
+        opacity: entered && !closing ? 1 : 0,
         transition: "opacity 400ms ease",
       }}
     >
@@ -68,7 +77,7 @@ export function TrackPage({ trackId, onClose, onReadArticle }: TrackPageProps) {
           Bits&apos;nBrews
         </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="pointer-events-auto group flex items-center gap-2 text-[12px] font-medium text-white/55 hover:text-white/90 border border-white/12 hover:border-white/25 rounded-lg px-4 py-2 transition-colors duration-200 cursor-pointer bg-[#12151d]"
         >
           <span className="inline-block transition-transform duration-200 group-hover:-translate-x-0.5">
@@ -83,8 +92,8 @@ export function TrackPage({ trackId, onClose, onReadArticle }: TrackPageProps) {
       <div
         className="max-w-[760px] mx-auto px-6 sm:px-8 pt-28 pb-32 flex-grow w-full flex flex-col gap-12 text-left"
         style={{
-          opacity: entered ? 1 : 0,
-          transform: entered ? "translateY(0)" : "translateY(16px)",
+          opacity: entered && !closing ? 1 : 0,
+          transform: entered && !closing ? "translateY(0)" : "translateY(16px)",
           transition: "opacity 600ms ease 100ms, transform 600ms ease 100ms",
         }}
       >

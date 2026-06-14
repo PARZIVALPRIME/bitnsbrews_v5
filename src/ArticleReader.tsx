@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { Article, ArticleSegment } from "./articles";
+import { ARTICLES, type Article, type ArticleSegment } from "./articles";
 import { Footer } from "./components/Footer";
 
 // ── Tiny inline formatter: **bold**, *italic*, `code` ───────────────────────
@@ -138,12 +138,11 @@ function Segment({ seg }: { seg: ArticleSegment }) {
   }
 }
 
-import { ARTICLES, Article } from "./articles";
-
 export function ArticleReader({ article, onClose, onNavigate }: { article: Article; onClose: () => void; onNavigate?: (id: string) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [entered, setEntered] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [activeId, setActiveId] = useState("");
   const [resumeTop, setResumeTop] = useState<number | null>(null);
 
@@ -161,10 +160,18 @@ export function ArticleReader({ article, onClose, onNavigate }: { article: Artic
         .replace(/(^-|-$)/g, ""),
     }));
 
+  const handleClose = () => {
+    setClosing(true);
+    setEntered(false);
+    setTimeout(() => {
+      onClose();
+    }, 450); // Matches transition duration
+  };
+
   useEffect(() => {
     const id = requestAnimationFrame(() => setEntered(true));
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -228,10 +235,11 @@ export function ArticleReader({ article, onClose, onNavigate }: { article: Artic
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-[#0b0d12]"
+      className="fixed inset-0 z-[60] bg-[#0b0d12] origin-center"
       style={{
-        opacity: entered ? 1 : 0,
-        transition: "opacity 400ms ease",
+        opacity: entered && !closing ? 1 : 0,
+        transform: entered && !closing ? "scale(1) translate3d(0, 0, 0)" : "scale(0.98) translate3d(0, 32px, 0)",
+        transition: "opacity 500ms cubic-bezier(0.16, 1, 0.3, 1), transform 500ms cubic-bezier(0.16, 1, 0.3, 1)",
       }}
     >
       {/* Reading progress */}
@@ -248,7 +256,7 @@ export function ArticleReader({ article, onClose, onNavigate }: { article: Artic
           Bits&apos;nBrews
         </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="pointer-events-auto group flex items-center gap-2 text-[12px] font-medium text-white/55 hover:text-white/90 border border-white/12 hover:border-white/25 rounded-lg px-4 py-2 transition-colors duration-200 cursor-pointer bg-[#12151d]"
         >
           <span className="inline-block transition-transform duration-200 group-hover:-translate-x-0.5">

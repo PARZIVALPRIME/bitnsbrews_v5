@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getComponent, getArticle } from "./articles";
 import { DOMAIN_ACCENTS } from "./soc/data";
-import { Footer } from "./components/Footer";
 
 interface ComponentPortalProps {
   componentId: string;
@@ -119,14 +118,24 @@ function SpecRow({ label, value }: { label: string; value: string }) {
 
 export function ComponentPortal({ componentId, onClose, onReadArticle }: ComponentPortalProps) {
   const [entered, setEntered] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [hoveredStep, setHoveredStep] = useState<number | null>(null);
   const comp = getComponent(componentId);
+
+  const handleClose = () => {
+    setClosing(true);
+    setEntered(false);
+    setTimeout(() => {
+      onClose();
+    }, 450); // Matches transition duration
+  };
 
   useEffect(() => {
     // A slightly longer timeout guarantees the browser registers the mounting state
     // before applying the CSS transition.
     const timer = setTimeout(() => setEntered(true), 50);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -144,13 +153,17 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0d12]/80 backdrop-blur-md transition-opacity duration-500 ease-in-out p-4 sm:p-8"
-      style={{ opacity: entered ? 1 : 0 }}
-      onClick={onClose}
+      style={{ opacity: entered && !closing ? 1 : 0 }}
+      onClick={handleClose}
     >
       {/* Main panel */}
       <div
-        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_4px_12px_rgba(0,0,0,0.5),0_32px_80px_rgba(0,0,0,0.6)] flex flex-col gap-8 scrollbar-thin transition-opacity duration-500 ease-in-out"
-        style={{ opacity: entered ? 1 : 0 }}
+        className="relative w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12151d] p-6 sm:p-10 shadow-[0_4px_12px_rgba(0,0,0,0.5),0_32px_80px_rgba(0,0,0,0.6)] flex flex-col gap-8 scrollbar-thin transition-all duration-500"
+        style={{
+          opacity: entered && !closing ? 1 : 0,
+          transform: entered && !closing ? "scale(1) translate3d(0, 0, 0)" : "scale(0.95) translate3d(0, 16px, 0)",
+          transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)"
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -176,7 +189,7 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
           </div>
 
           <button
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close (Esc)"
             className="flex items-center gap-2 text-[12px] text-white/50 hover:text-white/90 border border-white/12 hover:border-white/25 rounded-lg px-3.5 py-2 transition-colors duration-200 cursor-pointer shrink-0"
           >
@@ -221,7 +234,16 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
             {basicArticle ? (
               <button
                 onClick={() => onReadArticle(basicArticle.id)}
-                className="group rounded-xl border border-white/8 bg-[#0e1118] hover:border-white/20 hover:bg-[#11141d] p-5 cursor-pointer flex flex-col gap-3 text-left transition-colors duration-200"
+                onMouseEnter={() => setHoveredStep(1)}
+                onMouseLeave={() => setHoveredStep(null)}
+                className="group rounded-xl border p-5 cursor-pointer flex flex-col gap-3 text-left"
+                style={{
+                  borderColor: hoveredStep === 1 ? `${accent}50` : "rgba(255,255,255,0.08)",
+                  background: hoveredStep === 1 ? `${accent}0a` : "#0e1118",
+                  transform: hoveredStep === 1 ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)",
+                  boxShadow: hoveredStep === 1 ? `0 4px 20px ${accent}15` : "none",
+                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium" style={{ color: accent }}>
@@ -255,7 +277,16 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
             {advancedArticle ? (
               <button
                 onClick={() => onReadArticle(advancedArticle.id)}
-                className="group rounded-xl border border-white/8 bg-[#0e1118] hover:border-white/20 hover:bg-[#11141d] p-5 cursor-pointer flex flex-col gap-3 text-left transition-colors duration-200"
+                onMouseEnter={() => setHoveredStep(2)}
+                onMouseLeave={() => setHoveredStep(null)}
+                className="group rounded-xl border p-5 cursor-pointer flex flex-col gap-3 text-left"
+                style={{
+                  borderColor: hoveredStep === 2 ? `${accent}50` : "rgba(255,255,255,0.08)",
+                  background: hoveredStep === 2 ? `${accent}0a` : "#0e1118",
+                  transform: hoveredStep === 2 ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)",
+                  boxShadow: hoveredStep === 2 ? `0 4px 20px ${accent}15` : "none",
+                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-white/55">

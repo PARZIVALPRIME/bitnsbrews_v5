@@ -62,13 +62,11 @@ function Die() {
 
 export function SceneMobile({
   t,
-  showLabels,
   selected,
   setSelected,
   mode,
 }: {
   t: number;
-  showLabels: boolean;
   selected: string | null;
   setSelected: (id: string | null) => void;
   mode: SocMode;
@@ -98,8 +96,6 @@ export function SceneMobile({
           <SocBlock
             key={b.id}
             block={b}
-            t={t}
-            showLabels={showLabels}
             selected={selected === b.id}
             onSelect={setSelected}
             dimmed={selected !== null && selected !== b.id}

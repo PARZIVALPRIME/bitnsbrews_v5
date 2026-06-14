@@ -14,18 +14,8 @@ export const CHAPTERS = [
   },
   {
     level: 2,
-    id: "the-package",
-    chapter: "02",
-    tag: "PACKAGING",
-    title: "The Package",
-    subtitle: "MCM Silicon Substrate",
-    description:
-      "This is where the brain of the computer connects to the rest of the system. The package acts as a bridge, translating microscopic connections on the chip to larger wires on the main circuit board so they can talk to each other.",
-  },
-  {
-    level: 3,
     id: "silicon-die",
-    chapter: "03",
+    chapter: "02",
     tag: "SEMICONDUCTORS",
     title: "Silicon Die",
     subtitle: "3nm SoC Floorplan Layout",
@@ -33,9 +23,9 @@ export const CHAPTERS = [
       "Deep inside, billions of tiny switches work together on a piece of silicon smaller than a postage stamp. Made with advanced technology, this is the core where raw electricity turns into logical decisions.",
   },
   {
-    level: 4,
+    level: 3,
     id: "the-library",
-    chapter: "04",
+    chapter: "03",
     tag: "KNOWLEDGE MAP",
     title: "The Library",
     subtitle: "The Die as a Table of Contents",
@@ -43,9 +33,9 @@ export const CHAPTERS = [
       "Click on any of the glowing functional blocks on the die to pull up its dedicated deep dive, hardware specs, and related articles.",
   },
   {
-    level: 5,
+    level: 4,
     id: "hub",
-    chapter: "05",
+    chapter: "04",
     tag: "INDEX & DIRECTORY",
     title: "The Hub",
     subtitle: "Technical Index & Team Directory",

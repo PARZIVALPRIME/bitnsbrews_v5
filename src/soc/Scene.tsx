@@ -4,13 +4,12 @@ import { useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Lightformer, Edges, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing";
 import { BLOCKS, DIE_W, DIE_D, SocMode, UTILIZATION } from "./data";
-import { ARTICLE_BLOCK_IDS } from "../articles";
 import { SocBlock } from "./SocBlock";
 
 // Memoized: blocks only re-render when their own quantized props change, not on
 // every levelFloat tick — the single biggest CPU saving during transitions.
 const MemoSocBlock = memo(SocBlock);
-import { getCameraParamsInterpolated } from "./levelManager";
+import { getCameraParamsInterpolated, globalLevelState } from "./levelManager";
 import { useQuality } from "./quality";
 import { PowerRailShader } from "./shaders";
 import { Particles } from "./Particles";
@@ -249,13 +248,13 @@ function DieIOPins({ dieW, dieD, opacity }: { dieW: number; dieD: number; opacit
   return <instancedMesh ref={ref} args={[pinGeometry, _pinMat, pinsData.length]} />;
 }
 
-function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
+function RainbowDatastreams() {
   const quality = useQuality();
   const streamCount = quality === "mobile" ? 16 : 36;
-  const streamVisible = levelFloat <= 1.8;
-  const opacityMultiplier = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.55); // fades out quickly
 
   const packetRefs = useRef<THREE.Mesh[]>([]);
+  const lineMatRefs = useRef<THREE.LineBasicMaterial[]>([]);
+  const packetMatRefs = useRef<THREE.MeshStandardMaterial[]>([]);
 
   const colors = ["#ff007f", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#ec4899", "#06b6d4", "#f97316"];
 
@@ -295,6 +294,26 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
   }, [streamCount]);
 
   useFrame((state) => {
+    const levelFloat = globalLevelState.current;
+    const streamVisible = levelFloat <= 1.8;
+    const opacityMultiplier = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.55);
+
+    // Update lines and packets visibility and opacity
+    lineMatRefs.current.forEach((mat) => {
+      if (mat) {
+        mat.opacity = 0.08 * opacityMultiplier;
+        mat.visible = streamVisible;
+      }
+    });
+
+    packetMatRefs.current.forEach((mat) => {
+      if (mat) {
+        mat.opacity = opacityMultiplier;
+        mat.emissiveIntensity = 100.0 * opacityMultiplier;
+        mat.visible = streamVisible;
+      }
+    });
+
     if (!streamVisible) return;
     const time = state.clock.getElapsedTime();
 
@@ -307,8 +326,6 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
       }
     });
   });
-
-  if (!streamVisible) return null;
 
   return (
     <group>
@@ -323,10 +340,10 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
               />
             </bufferGeometry>
             <lineBasicMaterial
+              ref={(el) => { if (el) lineMatRefs.current[i] = el; }}
               attach="material"
               color={path.color}
               transparent
-              opacity={0.08 * opacityMultiplier}
               linewidth={1}
             />
           </line>
@@ -339,11 +356,10 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
           >
             <sphereGeometry args={[0.11, 8, 8]} />
             <meshStandardMaterial
+              ref={(el) => { if (el) packetMatRefs.current[i] = el; }}
               color={path.color}
               emissive={path.color}
-              emissiveIntensity={100.0 * opacityMultiplier}
               transparent
-              opacity={opacityMultiplier}
             />
           </mesh>
         </group>
@@ -355,14 +371,34 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
 /* =========================================================================
    DIE SUBSTRATE & BASE
    ========================================================================= */
-function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
+function Die({ visMode }: { visMode: string }) {
   const dieW = DIE_W + 1.4;
   const dieD = DIE_D + 1.4;
   const rail = 0.14;
 
   const matRef = useRef<THREE.ShaderMaterial>(null!);
+  const waferMatRef = useRef<THREE.MeshStandardMaterial>(null!);
+  const waferEdgeMatRef = useRef<THREE.LineBasicMaterial>(null!);
+  const inlayMatRef = useRef<THREE.MeshStandardMaterial>(null!);
+  const borderMatRefs = useRef<THREE.MeshStandardMaterial[]>([]);
 
   useFrame((state) => {
+    const levelFloat = globalLevelState.current;
+    const chipProgress = Math.max(0, Math.min(1, levelFloat - 1.0));
+    const opacity = 0.85 + 0.15 * chipProgress;
+
+    // Update wafer body opacity
+    if (waferMatRef.current) waferMatRef.current.opacity = opacity;
+    if (waferEdgeMatRef.current) waferEdgeMatRef.current.opacity = (visMode === "logical" ? 0.8 : 0.35) * opacity;
+    if (inlayMatRef.current) inlayMatRef.current.opacity = opacity;
+    borderMatRefs.current.forEach((mat) => {
+      if (mat) mat.opacity = opacity;
+    });
+
+    // Update global interconnect/pin materials' opacity
+    _viaMat.opacity = 0.4 * opacity;
+    _pinMat.opacity = opacity;
+
     if (visMode === "power" && matRef.current) {
       matRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
     }
@@ -378,18 +414,18 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
 
   return (
     <group>
-      {/* Die slab — matte silicon wafer (matches the playground "full die" look) */}
+      {/* Die slab — silicon wafer */}
       <mesh position={[0, -0.3, 0]} receiveShadow castShadow>
         <boxGeometry args={[dieW, 0.6, dieD]} />
         <meshStandardMaterial
+          ref={waferMatRef}
           color={visMode === "logical" ? "#030408" : "#080c10"}
           metalness={visMode === "logical" ? 0.95 : 0.35}
           roughness={visMode === "logical" ? 0.25 : 0.75}
           transparent
-          opacity={opacity}
         />
         <Edges threshold={15} scale={1.001}>
-          <lineBasicMaterial color={AMBER} transparent opacity={visMode === "logical" ? 0.8 * opacity : 0.35 * opacity} />
+          <lineBasicMaterial ref={waferEdgeMatRef} color={AMBER} transparent />
         </Edges>
       </mesh>
 
@@ -410,14 +446,14 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
           <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
             <planeGeometry args={[dieW - 0.3, dieD - 0.3]} />
             <meshStandardMaterial
+              ref={inlayMatRef}
               color="#060910"
               metalness={0.3}
               roughness={0.8}
               transparent
-              opacity={opacity}
             />
           </mesh>
-          <DieInterconnects opacity={opacity} />
+          <DieInterconnects opacity={1.0} />
         </>
       )}
 
@@ -431,9 +467,10 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
         <mesh key={i} position={[x, y, z]}>
           <boxGeometry args={[w, h, d]} />
           <meshStandardMaterial
+            ref={(el) => { if (el) borderMatRefs.current[i] = el; }}
             color={AMBER}
             emissive={AMBER}
-            emissiveIntensity={(visMode === "logical" ? 1.2 : 0.55) * opacity}
+            emissiveIntensity={visMode === "logical" ? 1.2 : 0.55}
             metalness={1}
             roughness={0.15}
             transparent
@@ -441,7 +478,7 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
         </mesh>
       ))}
       {/* Input Output pins at the edges of the die */}
-      <DieIOPins dieW={dieW} dieD={dieD} opacity={opacity} />
+      <DieIOPins dieW={dieW} dieD={dieD} opacity={1.0} />
     </group>
   );
 }
@@ -450,15 +487,9 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
    CINEMATIC CAMERA SYSTEM
    ========================================================================= */
 function CameraController({
-  levelFloat,
   selectedBlockCoords,
-  uiTransitionRef,
 }: {
-  levelFloat: number;
   selectedBlockCoords: { cx: number; cz: number; h: number } | null;
-  uiTransitionRef?: React.MutableRefObject<{
-    onUpdate: (levelFloat: number) => void;
-  } | null>;
 }) {
   const { camera } = useThree();
   const targetRef = useRef(new THREE.Vector3(0, 1.5, 0));
@@ -475,13 +506,12 @@ function CameraController({
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-  const targetParams = useMemo(
-    () => getCameraParamsInterpolated(levelFloat, selectedBlockCoords),
-    [levelFloat, selectedBlockCoords]
-  );
-
   useFrame((state) => {
+    const levelFloat = globalLevelState.current;
     const time = state.clock.getElapsedTime();
+
+    // Get camera params dynamically
+    const targetParams = getCameraParamsInterpolated(levelFloat, selectedBlockCoords);
 
     // Subtle micro-breathing drift
     const driftX = Math.sin(time * 0.35) * 0.08;
@@ -501,19 +531,20 @@ function CameraController({
       new THREE.Vector3(driftX + parallax.current.x, driftY + parallax.current.y, driftZ)
     );
 
-    // Heavy cinematic easing: lerp position and lookAt target at slightly different rates
-    camera.position.lerp(finalPos, 0.045);
-    targetRef.current.lerp(targetParams.target, 0.05);
+    // Apply flight-sim style roll banking around forward direction
+    const forward = new THREE.Vector3().subVectors(targetParams.target, targetParams.position).normalize();
+    const upVector = new THREE.Vector3(0, 1, 0).applyAxisAngle(forward, targetParams.roll || 0);
+    camera.up.copy(upVector);
+
+    // Faster cinematic easing to follow the spring overshoot nicely
+    camera.position.lerp(finalPos, 0.14);
+    targetRef.current.lerp(targetParams.target, 0.15);
     camera.lookAt(targetRef.current);
 
     const persCam = camera as THREE.PerspectiveCamera;
     if (persCam.isPerspectiveCamera) {
-      persCam.fov += (targetParams.fov - persCam.fov) * 0.05;
+      persCam.fov += (targetParams.fov - persCam.fov) * 0.14;
       persCam.updateProjectionMatrix();
-    }
-
-    if (uiTransitionRef && uiTransitionRef.current && uiTransitionRef.current.onUpdate) {
-      uiTransitionRef.current.onUpdate(levelFloat);
     }
   });
 
@@ -523,43 +554,63 @@ function CameraController({
 /* =========================================================================
    LIGHTS SETUP
    ========================================================================= */
-function Lights({ visMode, levelFloat }: { visMode: string; levelFloat: number }) {
+function Lights({ visMode }: { visMode: string }) {
   const quality = useQuality();
   const isMobile = quality === "mobile";
   const isThermal = visMode === "thermal";
-  
-  // Spotlight intensity for chapter 1: Fades out as we scroll away from chapter 1 (levelFloat > 1.0)
-  const spotlightIntensity = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.5) * 45.0;
 
-  // Dynamic ambient light that is brighter in chapter 1
-  const ambientIntensity = isThermal
-    ? 0.05
-    : 0.22 + Math.max(0, 1.0 - (levelFloat - 1.0) * 1.55) * 0.5;
+  const ambientRef = useRef<THREE.AmbientLight>(null!);
+  const spotRef = useRef<THREE.SpotLight>(null!);
+  const dir1Ref = useRef<THREE.DirectionalLight>(null!);
+  const dir2Ref = useRef<THREE.DirectionalLight>(null!);
+
+  useFrame(() => {
+    const levelFloat = globalLevelState.current;
+
+    // Spotlight intensity: Fades out as we scroll away from chapter 1 (levelFloat > 1.0)
+    const spotlightIntensity = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.5) * 45.0;
+
+    // Dynamic ambient light that is brighter in chapter 1
+    const ambientIntensity = isThermal
+      ? 0.05
+      : 0.22 + Math.max(0, 1.0 - (levelFloat - 1.0) * 1.55) * 0.5;
+
+    if (ambientRef.current) ambientRef.current.intensity = ambientIntensity;
+    if (spotRef.current) {
+      spotRef.current.intensity = spotlightIntensity;
+      spotRef.current.visible = spotlightIntensity > 0.01;
+    }
+    if (dir1Ref.current) {
+      dir1Ref.current.intensity = isThermal ? 0.3 : 2.4;
+    }
+    if (dir2Ref.current) {
+      dir2Ref.current.intensity = isThermal ? 0.15 : 0.55;
+    }
+  });
 
   return (
     <>
-      <ambientLight intensity={ambientIntensity} color="#0c0c0a" />
+      <ambientLight ref={ambientRef} intensity={0.22} color="#0c0c0a" />
 
-      {/* Cool sky / warm ground gradient — makes block faces read as 3D volumes */}
+      {/* Cool sky / warm ground gradient */}
       {!isThermal && <hemisphereLight args={["#2e3850", "#191007", 0.55]} />}
 
-      {/* Chapter 1 Hero Spotlight — no shadow casting: the key light already
-          casts, and a second shadow pass doubles the geometry cost. */}
-      {spotlightIntensity > 0.01 && (
-        <spotLight
-          position={[0, 18, 0]}
-          intensity={spotlightIntensity}
-          color="#fff3df"
-          angle={Math.PI / 4.5}
-          penumbra={0.7}
-          decay={0}
-        />
-      )}
+      {/* Chapter 1 Hero Spotlight */}
+      <spotLight
+        ref={spotRef}
+        position={[0, 18, 0]}
+        intensity={45}
+        color="#fff3df"
+        angle={Math.PI / 4.5}
+        penumbra={0.7}
+        decay={0}
+      />
 
-      {/* Warm key microscope light — the single shadow-casting light */}
+      {/* Warm key microscope light */}
       <directionalLight
+        ref={dir1Ref}
         position={[-8, 20, 10]}
-        intensity={isThermal ? 0.3 : 2.4}
+        intensity={2.4}
         color="#fff0d8"
         castShadow={!isMobile}
         shadow-mapSize-width={isMobile ? 512 : 1024}
@@ -574,12 +625,12 @@ function Lights({ visMode, levelFloat }: { visMode: string; levelFloat: number }
       />
 
       {/* Cool fill light */}
-      <directionalLight position={[12, 4, -8]} intensity={isThermal ? 0.15 : 0.55} color="#0a1530" />
+      <directionalLight ref={dir2Ref} position={[12, 4, -8]} intensity={0.55} color="#0a1530" />
 
       {/* Amber rim catch */}
       <directionalLight position={[-5, 3, -18]} intensity={0.8} color={AMBER} />
 
-      {/* Subtle overhead downwash for top-face readability */}
+      {/* Subtle overhead downwash */}
       <directionalLight position={[0, 18, 0]} intensity={isThermal ? 0 : 0.25} color="#d8d0c8" />
     </>
   );
@@ -590,35 +641,18 @@ function Lights({ visMode, levelFloat }: { visMode: string; levelFloat: number }
    ========================================================================= */
 interface SceneProps {
   t: number;
-  showLabels: boolean;
   selected: string | null;
   setSelected: (id: string | null) => void;
   mode: SocMode;
   targetLevel: number;
   visMode?: string;
-  uiTransitionRef?: React.MutableRefObject<{
+  uiTransitionRef?: React.RefObject<{
     onUpdate: (levelFloat: number) => void;
   } | null>;
 }
 
-function getStaggeredT(blockId: string, manualT: number): number {
-  const block = BLOCKS.find((b) => b.id === blockId);
-  if (!block) return manualT;
-  const cx = block.cx;
-  const cz = block.cz;
-  const dist = Math.sqrt(cx * cx + cz * cz);
-  const maxDist = 11.5;
-  const normDist = Math.min(1.0, dist / maxDist);
-  
-  const delay = normDist * 0.45;
-  const localT = Math.max(0, Math.min(1, (manualT - delay) / (1.0 - delay)));
-  
-  return localT * localT * (3 - 2 * localT);
-}
-
 export function Scene({
-  t,
-  showLabels,
+  t: _t,
   selected,
   setSelected,
   mode,
@@ -626,26 +660,70 @@ export function Scene({
   visMode = "physical",
   uiTransitionRef,
 }: SceneProps) {
-  const [levelFloat, setLevelFloat] = useState(targetLevel);
+  const [level, setLevel] = useState(Math.round(targetLevel));
 
-  useEffect(() => {
-    let raf: number;
-    const ease = () => {
-      setLevelFloat((prev) => {
-        const diff = targetLevel - prev;
-        if (Math.abs(diff) < 0.02) return targetLevel; // snap & settle
-        return Math.round((prev + diff * 0.12) * 50) / 50;
-      });
-      raf = requestAnimationFrame(ease);
-    };
-    raf = requestAnimationFrame(ease);
-    return () => cancelAnimationFrame(raf);
-  }, [targetLevel]);
+  const spring = useRef({
+    current: targetLevel,
+    target: targetLevel,
+    velocity: 0,
+    stiffness: 85, // Stiffness of the spring
+    damping: 18,   // Damping friction
+  });
+
+  const chipGroupRef = useRef<THREE.Group>(null!);
+  const fogRef = useRef<THREE.Fog>(null!);
+
+  useFrame((_, delta) => {
+    const s = spring.current;
+    s.target = targetLevel;
+
+    // Clamp delta to avoid huge jumps on frame drops
+    const dt = Math.min(0.03, delta);
+
+    // Spring physics step
+    const x = s.current - s.target;
+    const accel = -s.stiffness * x - s.damping * s.velocity;
+    s.velocity += accel * dt;
+    s.current += s.velocity * dt;
+
+    // Snap to target when close
+    if (Math.abs(s.current - s.target) < 0.0015 && Math.abs(s.velocity) < 0.005) {
+      s.current = s.target;
+      s.velocity = 0;
+    }
+
+    // Update global level state
+    globalLevelState.current = s.current;
+    globalLevelState.target = s.target;
+
+    // 1. Sync HTML panels
+    if (uiTransitionRef && uiTransitionRef.current) {
+      uiTransitionRef.current.onUpdate(s.current);
+    }
+
+    // 2. Update rounded level state (rarely triggers React re-render)
+    const nextLevel = Math.round(s.current);
+    if (nextLevel !== level) {
+      setLevel(nextLevel);
+    }
+
+    // 3. Update dynamic fog arguments
+    const cameraDist = s.current <= 1.5 ? 135 : s.current <= 2.5 ? 60 : 50;
+    if (fogRef.current) {
+      fogRef.current.near = cameraDist * 0.9;
+      fogRef.current.far = cameraDist * 1.8;
+    }
+
+    // 4. Update chip Y position
+    const chipProgress = Math.max(0, Math.min(1, s.current - 1.0));
+    const chipY = -0.5 * (1 - chipProgress);
+    if (chipGroupRef.current) {
+      chipGroupRef.current.position.y = chipY;
+    }
+  });
+
   const quality = useQuality();
   const isMobile = quality === "mobile";
-  
-  // Rounded level for visual model activation boundaries
-  const level = Math.round(levelFloat);
 
   const selectedBlock = useMemo(
     () => BLOCKS.find((b) => b.id === selected) || null,
@@ -657,27 +735,15 @@ export function Scene({
     return { cx: selectedBlock.cx, cz: selectedBlock.cz, h: selectedBlock.h };
   }, [selectedBlock]);
 
-  // Transition values for the chip components
-  // In Chapter 1, the chip sits at -0.5 units height, visible with 0.85 opacity.
-  // As you scroll to Chapter 2, it slides up to 0 and becomes fully opaque.
-  const chipProgress = Math.max(0, Math.min(1, levelFloat - 1.0));
-  const chipY = -0.5 * (1 - chipProgress); 
-  const chipOpacity = 0.85 + 0.15 * chipProgress;
-
-  // Dynamic fog arguments to prevent the chip from being hidden by the fog in Chapter 1 (camera at [0, 80, 100])
-  const cameraDist = levelFloat <= 1.5 ? 135 : levelFloat <= 2.5 ? 60 : 50;
-  const fogStart = cameraDist * 0.9;
-  const fogEnd = cameraDist * 1.8;
-
   return (
     <>
       {/* Transparent canvas background allows HTML circuit traces to show behind the 3D casing */}
-      <fog attach="fog" args={["#08090e", fogStart, fogEnd]} />
+      <fog ref={fogRef} attach="fog" args={["#08090e", 45, 90]} />
 
       {/* GPU-accelerated atmospheric dust particles */}
-      <Particles count={isMobile ? 120 : 450} color="#c79a4e" levelFloat={levelFloat} />
+      <Particles count={isMobile ? 120 : 450} color="#c79a4e" />
 
-      <Lights visMode={visMode} levelFloat={levelFloat} />
+      <Lights visMode={visMode} />
 
       {!isMobile ? (
         <Environment resolution={128}>
@@ -689,57 +755,32 @@ export function Scene({
       ) : null}
 
       <CameraController
-        levelFloat={levelFloat}
         selectedBlockCoords={selectedBlockCoords}
-        uiTransitionRef={uiTransitionRef}
       />
 
       <group onPointerMissed={() => setSelected(null)}>
         {/* Layer 1: Computer Shell (slides down & fades out) */}
-        <ComputerCasing levelFloat={levelFloat} />
+        <ComputerCasing />
 
         {/* Rainbow Datastreams flowing into the die on Chapter 1 */}
-        <RainbowDatastreams levelFloat={levelFloat} />
+        <RainbowDatastreams />
 
         {/* Layer 2: Semiconductor SoC (slides up & fades in) */}
-        <group position={[0, chipY, 0]}>
-          <PackageSubstrate opacity={chipOpacity} />
-          <Die visMode={visMode} opacity={chipOpacity} />
+        <group ref={chipGroupRef} position={[0, -0.5, 0]}>
+          <PackageSubstrate />
+          <Die visMode={visMode} />
           
-          {(() => {
-            // The Library (level 4) auto-raises every block in a center-out ripple
-            // tied to the camera swoop. Ramps up entering 4, back down toward the Hub.
-            // All derived values are quantized so memoized blocks skip re-renders.
-            const rampUp = Math.max(0, Math.min(1, (levelFloat - 3.05) / 0.85));
-            const rampDown = Math.max(0, Math.min(1, (levelFloat - 4.1) / 0.8));
-            const galleryT = Math.round(rampUp * (1 - rampDown) * 100) / 100;
-            // Gentler, smoothly-interpolated lift so the explode never flies off-frame.
-            const liftScale =
-              Math.round((0.6 - Math.max(0, Math.min(1, levelFloat - 3.0)) * 0.15) * 100) / 100;
-            const qOpacity = Math.round(chipOpacity * 50) / 50;
-            return BLOCKS.map((b) => {
-              const isArticleBlock = ARTICLE_BLOCK_IDS.has(b.id);
-              const effT = Math.max(t, galleryT);
-              return (
-                <MemoSocBlock
-                  key={b.id}
-                  block={b}
-                  t={getStaggeredT(b.id, effT)}
-                  showLabels={showLabels && level <= 3}
-                  selected={selected === b.id}
-                  onSelect={setSelected}
-                  dimmed={selected !== null && selected !== b.id}
-                  modeUtilization={getUtil(b.id, mode)}
-                  visMode={visMode}
-                  opacity={qOpacity}
-                  focused={false}
-                  level={level}
-                  liftScale={liftScale}
-                  galleryPulse={level === 4 && isArticleBlock && !isMobile}
-                />
-              );
-            });
-          })()}
+          {BLOCKS.map((b) => (
+            <MemoSocBlock
+              key={b.id}
+              block={b}
+              selected={selected === b.id}
+              onSelect={setSelected}
+              dimmed={selected !== null && selected !== b.id}
+              modeUtilization={getUtil(b.id, mode)}
+              visMode={visMode}
+            />
+          ))}
         </group>
 
       </group>
