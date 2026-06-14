@@ -597,7 +597,13 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: "none",
         }}
       >
-        <div>
+        <div
+          style={{
+            opacity: chapterVisible ? 1 : 0,
+            transform: chapterVisible ? "translate3d(0, 0, 0)" : "translate3d(0, 6px, 0)",
+            transition: "opacity 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+        >
           <div className="text-[9.5px] font-mono tracking-[0.12em] text-[#8aa9ff] mb-2 uppercase">
             Chapter {currentChapter.chapter}
           </div>

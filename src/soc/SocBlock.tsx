@@ -195,12 +195,17 @@ export function SocBlock({
   // The Library (level 4): each main block carries one editorial track card.
   const track = useMemo(() => getTrackForBlock(block.id), [block.id]);
 
-  // Labels: only the 9 major (track-bearing) blocks get always-on labels — DOM
-  // overlays are expensive, and 17 of them cluttered the floorplan anyway.
-  // Any block still shows its label while selected. On Level 4, we show the component name labels.
+  // Labels: DOM overlays are expensive. On Level 3, 17 of them clutter the floorplan, so we only show them on hover.
+  // On Level 4, we show the 9 major components unconditionally as the table of contents.
+  // Selected blocks ALWAYS show their label.
   const labelVisible = (level <= 4) && (isMobile
     ? selected
-    : (((level === 4 || _showLabels) && block.showLabel && !!track && !dimmed) || selected));
+    : (
+        selected ||
+        (hovered && !dimmed) ||
+        (level === 4 && block.showLabel && !!track && !dimmed)
+      )
+  );
 
   return (
     <group position={[cx, 0, cz]}>
