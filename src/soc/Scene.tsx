@@ -9,6 +9,7 @@ import { SocBlock } from "./SocBlock";
 // Memoized: blocks only re-render when their own quantized props change, not on
 // every levelFloat tick — the single biggest CPU saving during transitions.
 const MemoSocBlock = memo(SocBlock);
+import { TrafficNetwork } from "./Traffic";
 import { getCameraParamsInterpolated, globalLevelState } from "./levelManager";
 import { useQuality } from "./quality";
 import { PowerRailShader } from "./shaders";
@@ -488,8 +489,10 @@ function Die({ visMode }: { visMode: string }) {
    ========================================================================= */
 function CameraController({
   selectedBlockCoords,
+  showPlayground,
 }: {
   selectedBlockCoords: { cx: number; cz: number; h: number } | null;
+  showPlayground?: boolean;
 }) {
   const { camera } = useThree();
   const targetRef = useRef(new THREE.Vector3(0, 1.5, 0));
@@ -507,6 +510,8 @@ function CameraController({
   }, []);
 
   useFrame((state) => {
+    if (showPlayground) return; // Yield complete camera control to OrbitControls!
+
     const levelFloat = globalLevelState.current;
     const time = state.clock.getElapsedTime();
 
@@ -536,14 +541,14 @@ function CameraController({
     const upVector = new THREE.Vector3(0, 1, 0).applyAxisAngle(forward, targetParams.roll || 0);
     camera.up.copy(upVector);
 
-    // Faster cinematic easing to follow the spring overshoot nicely
-    camera.position.lerp(finalPos, 0.14);
-    targetRef.current.lerp(targetParams.target, 0.15);
+    // Slower cinematic easing for a gorgeous, smooth glide
+    camera.position.lerp(finalPos, 0.065);
+    targetRef.current.lerp(targetParams.target, 0.065);
     camera.lookAt(targetRef.current);
 
     const persCam = camera as THREE.PerspectiveCamera;
     if (persCam.isPerspectiveCamera) {
-      persCam.fov += (targetParams.fov - persCam.fov) * 0.14;
+      persCam.fov += (targetParams.fov - persCam.fov) * 0.065;
       persCam.updateProjectionMatrix();
     }
   });
@@ -649,18 +654,45 @@ interface SceneProps {
   uiTransitionRef?: React.RefObject<{
     onUpdate: (levelFloat: number) => void;
   } | null>;
+  showPlayground?: boolean;
+  playgroundShowLabels?: boolean;
+  interactionRef?: React.MutableRefObject<{ zoom: (factor: number) => void; resetView: () => void } | null>;
 }
 
 export function Scene({
-  t: _t,
+  t,
   selected,
   setSelected,
   mode,
   targetLevel,
   visMode = "physical",
   uiTransitionRef,
+  showPlayground = false,
+  playgroundShowLabels = true,
+  interactionRef,
 }: SceneProps) {
   const [level, setLevel] = useState(Math.round(targetLevel));
+  const { camera } = useThree();
+
+  useEffect(() => {
+    if (interactionRef) {
+      interactionRef.current = {
+        zoom: (factor: number) => {
+          const len = camera.position.length();
+          const next = Math.min(68, Math.max(16, len * factor));
+          camera.position.multiplyScalar(next / len);
+          camera.updateMatrixWorld(true);
+        },
+        resetView: () => {
+          camera.position.set(20, 16, 22);
+          camera.lookAt(0, 1.5, 0);
+        }
+      };
+    }
+    return () => {
+      if (interactionRef) interactionRef.current = null;
+    };
+  }, [camera, interactionRef]);
 
   const spring = useRef({
     current: targetLevel,
@@ -756,7 +788,25 @@ export function Scene({
 
       <CameraController
         selectedBlockCoords={selectedBlockCoords}
+        showPlayground={showPlayground}
       />
+
+      {showPlayground && (
+        <OrbitControls
+          makeDefault
+          enableDamping
+          dampingFactor={0.06}
+          minPolarAngle={0.2}
+          maxPolarAngle={Math.PI / 2.15}
+          minDistance={16}
+          maxDistance={70}
+          target={[0, 1.5, 0]}
+        />
+      )}
+
+      {showPlayground && (
+        <TrafficNetwork mode={mode} t={t} />
+      )}
 
       <group onPointerMissed={() => setSelected(null)}>
         {/* Layer 1: Computer Shell (slides down & fades out) */}
@@ -779,6 +829,9 @@ export function Scene({
               dimmed={selected !== null && selected !== b.id}
               modeUtilization={getUtil(b.id, mode)}
               visMode={visMode}
+              t={t}
+              showPlayground={showPlayground}
+              playgroundShowLabels={playgroundShowLabels}
             />
           ))}
         </group>

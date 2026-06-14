@@ -23,6 +23,9 @@ export function SocBlock({
   dimmed,
   modeUtilization,
   visMode = "physical",
+  t: playgroundT,
+  showPlayground = false,
+  playgroundShowLabels = true,
 }: {
   block: Block;
   selected: boolean;
@@ -30,6 +33,9 @@ export function SocBlock({
   dimmed: boolean;
   modeUtilization: number;
   visMode?: string;
+  t?: number;
+  showPlayground?: boolean;
+  playgroundShowLabels?: boolean;
 }) {
   const quality = useQuality();
   const isMobile = quality === "mobile";
@@ -92,18 +98,27 @@ export function SocBlock({
     const doMatUpdate = !isMobile || frameSkip.current === 0;
 
     // 1. Calculate gallery transition progress (Level 2 to Level 3)
-    const rampUp = Math.max(0, Math.min(1, (levelFloat - 2.05) / 0.85));
-    const rampDown = Math.max(0, Math.min(1, (levelFloat - 3.1) / 0.8));
-    const galleryT = rampUp * (1 - rampDown);
-
-    // 2. Staggered delay based on distance from the center
-    const normDist = Math.min(1.0, dist / 11.5);
-    const delay = normDist * 0.45;
-    const localT = Math.max(0, Math.min(1, (galleryT - delay) / (1.0 - delay)));
-    const staggeredT = localT * localT * (3 - 2 * localT);
-
-    // 3. Dynamic liftScale to shrink blocks as camera pulls back
-    const liftScale = 0.6 - Math.max(0, Math.min(1, levelFloat - 2.0)) * 0.15;
+    //    In playground mode, use the explode slider value directly.
+    let staggeredT: number;
+    let liftScale: number;
+    if (showPlayground && playgroundT !== undefined) {
+      // Playground mode: use explode factor with staggered delay for visual interest
+      const normDist = Math.min(1.0, dist / 11.5);
+      const delay = normDist * 0.25;
+      const localT = Math.max(0, Math.min(1, (playgroundT - delay) / (1.0 - delay)));
+      staggeredT = localT * localT * (3 - 2 * localT);
+      liftScale = 1.15; // Wider spread in playground
+    } else {
+      const rampUp = Math.max(0, Math.min(1, (levelFloat - 2.05) / 0.85));
+      const rampDown = Math.max(0, Math.min(1, (levelFloat - 3.1) / 0.8));
+      const galleryT = rampUp * (1 - rampDown);
+      const normDist = Math.min(1.0, dist / 11.5);
+      const delay = normDist * 0.45;
+      const localT = Math.max(0, Math.min(1, (galleryT - delay) / (1.0 - delay)));
+      staggeredT = localT * localT * (3 - 2 * localT);
+      // 3. Dynamic liftScale to shrink blocks as camera pulls back
+      liftScale = 0.6 - Math.max(0, Math.min(1, levelFloat - 2.0)) * 0.15;
+    }
 
     // 4. Spring physics solver step for physical block lift 'cur.current'
     const dt = Math.min(0.03, delta);
@@ -232,9 +247,11 @@ export function SocBlock({
 
   const track = useMemo(() => getTrackForBlock(block.id), [block.id]);
   const showLabels = level === 2;
-  const labelVisible = (level >= 2 && level <= 3) && (isMobile
-    ? selected
-    : (((level === 3 || showLabels) && block.showLabel && !!track && !dimmed) || selected));
+  const labelVisible = showPlayground
+    ? (playgroundShowLabels && block.showLabel) || selected
+    : (level >= 2 && level <= 3) && (isMobile
+      ? selected
+      : (((level === 3 || showLabels) && block.showLabel && !!track && !dimmed) || selected));
 
   return (
     <group position={[cx, 0, cz]}>

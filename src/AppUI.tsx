@@ -11,7 +11,7 @@ import { ComponentPortal } from "./ComponentPortal";
 import { TrackPage } from "./TrackPage";
 import { Footer } from "./components/Footer";
 import { SearchPalette } from "./components/SearchPalette";
-import { BLOCKS } from "./soc/data";
+import { BLOCKS, SocMode } from "./soc/data";
 import { ARTICLE_BLOCK_IDS } from "./articles";
 import { TrackIcon } from "./components/TrackIcon";
 
@@ -21,10 +21,13 @@ interface SceneProps {
   t: number;
   selected: string | null;
   setSelected: (id: string | null) => void;
-  mode: "Idle";
+  mode: SocMode;
   targetLevel: number;
   visMode: string;
   uiTransitionRef?: React.RefObject<{ onUpdate: (levelFloat: number) => void } | null>;
+  showPlayground?: boolean;
+  playgroundShowLabels?: boolean;
+  interactionRef?: React.MutableRefObject<{ zoom: (factor: number) => void; resetView: () => void } | null>;
 }
 
 interface UiProps {
@@ -59,6 +62,15 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   }, [readerArticleId, activeComponentPortal, activeTrackPageId, isSearchOpen]);
 
   const [showPlayground, setShowPlayground] = useState(false);
+  const [playgroundMode, setPlaygroundMode] = useState<SocMode>("Idle");
+  const [playgroundT, setPlaygroundT] = useState(1.0);
+  const [playgroundShowLabels, setPlaygroundShowLabels] = useState(true);
+  const sceneInteractionRef = useRef<{ zoom: (factor: number) => void; resetView: () => void } | null>(null);
+
+  const showPlaygroundRef = useRef(showPlayground);
+  useEffect(() => {
+    showPlaygroundRef.current = showPlayground;
+  }, [showPlayground]);
 
   // Performance scaling settings
   const [perfMode, setPerfMode] = useState<"high" | "low">("high");
@@ -109,6 +121,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     // Parallax displacements (max 6px)
     const mx = mouse.current.x * 6;
     const my = mouse.current.y * 6;
+    const playgroundActive = showPlaygroundRef.current;
 
     // 1. Chapter 1 Hero Panel
     if (heroPanelRef.current) {
@@ -122,7 +135,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     // 2. Chapters 2–4 Panel
     if (chapterPanelRef.current) {
       let opacity = 0;
-      if (levelFloat >= 1.7 && levelFloat <= 4.25) {
+      if (!playgroundActive && levelFloat >= 1.7 && levelFloat <= 4.25) {
         const fromCh1 = Math.min(1, (levelFloat - 1.7) * 4.5);
         const toCh5 = Math.min(1, (4.25 - levelFloat) * 4.0);
         opacity = Math.min(fromCh1, toCh5);
@@ -135,7 +148,10 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
     // 3. Chapter 3 Tracks Menu
     if (tracksMenuRef.current) {
-      const opacity = Math.max(0, 1 - Math.abs(levelFloat - 3) * 3.0);
+      let opacity = 0;
+      if (!playgroundActive) {
+        opacity = Math.max(0, 1 - Math.abs(levelFloat - 3) * 3.0);
+      }
       const ty = (levelFloat - 3) * -25 + my;
       tracksMenuRef.current.style.opacity = `${opacity}`;
       tracksMenuRef.current.style.transform = `translate3d(${mx}px, ${ty}px, 0)`;
@@ -144,7 +160,10 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
     // 4. Detail Panel
     if (detailPanelRef.current) {
-      const opacity = Math.max(0, 1 - Math.abs(levelFloat - 3) * 3.0);
+      let opacity = 0;
+      if (!playgroundActive) {
+        opacity = Math.max(0, 1 - Math.abs(levelFloat - 3) * 3.0);
+      }
       detailPanelRef.current.style.opacity = `${opacity}`;
       detailPanelRef.current.style.transform = `translate3d(${mx}px, ${my}px, 0)`;
       detailPanelRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
@@ -152,7 +171,10 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
     // 5. Progress Bar
     if (progressBarRef.current) {
-      const opacity = Math.max(0, 1 - Math.max(0, levelFloat - 4) * 2.2);
+      let opacity = 0;
+      if (!playgroundActive) {
+        opacity = Math.max(0, 1 - Math.max(0, levelFloat - 4) * 2.2);
+      }
       progressBarRef.current.style.opacity = `${opacity}`;
       progressBarRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
     }
@@ -415,13 +437,16 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             >
               <Suspense fallback={null}>
                 <SceneEl
-                  t={t}
+                  t={showPlayground ? playgroundT : t}
                   selected={selectedBlock}
                   setSelected={handleBlockSelect}
-                  mode="Idle"
+                  mode={showPlayground ? playgroundMode : "Idle"}
                   targetLevel={targetLevel}
                   visMode={visMode}
                   uiTransitionRef={uiTransitionRef}
+                  showPlayground={showPlayground}
+                  playgroundShowLabels={playgroundShowLabels}
+                  interactionRef={sceneInteractionRef}
                 />
               </Suspense>
             </PerformanceMonitor>
@@ -916,6 +941,16 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {showPlayground && (
         <PlaygroundOverlay
+          mode={playgroundMode}
+          setMode={setPlaygroundMode}
+          t={playgroundT}
+          setT={setPlaygroundT}
+          showLabels={playgroundShowLabels}
+          setShowLabels={setPlaygroundShowLabels}
+          selected={selectedBlock}
+          setSelected={setSelectedBlock}
+          onZoom={(factor) => sceneInteractionRef.current?.zoom(factor)}
+          onResetView={() => sceneInteractionRef.current?.resetView()}
           quality={perfMode === "high" ? "desktop" : "mobile"}
           onClose={() => setShowPlayground(false)}
         />

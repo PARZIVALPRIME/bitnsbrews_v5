@@ -1,9 +1,5 @@
-import { Suspense, useState, useMemo, useEffect, useRef } from "react";
-import * as THREE from "three";
-import { Canvas, useThree } from "@react-three/fiber";
-import { Scene as PlaygroundScene } from "./PlaygroundScene";
+import { useState, useMemo, useEffect } from "react";
 import { BLOCKS, DOMAIN_ACCENTS, SocMode, UTILIZATION, accentFor } from "./data";
-import { QualityContext } from "./quality";
 
 const MODES: { id: SocMode; label: string }[] = [
   { id: "Idle",   label: "Idle" },
@@ -26,24 +22,36 @@ const LEGEND = [
   { label: "LPDDR5x", color: DOMAIN_ACCENTS.lpddr },
 ];
 
-function CameraController({ cameraRef }: { cameraRef: React.MutableRefObject<THREE.Camera | null> }) {
-  const { camera } = useThree();
-  useEffect(() => { cameraRef.current = camera; }, [camera, cameraRef]);
-  return null;
+interface PlaygroundOverlayProps {
+  onClose: () => void;
+  quality?: "desktop" | "mobile";
+  // State lifted to AppUI — driven through the main Canvas
+  mode: SocMode;
+  setMode: (mode: SocMode) => void;
+  t: number;
+  setT: (t: number) => void;
+  showLabels: boolean;
+  setShowLabels: (fn: (prev: boolean) => boolean) => void;
+  selected: string | null;
+  setSelected: (id: string | null) => void;
+  // Interaction callbacks forwarded from Scene via ref
+  onZoom: (factor: number) => void;
+  onResetView: () => void;
 }
 
 export function PlaygroundOverlay({
   onClose,
-  quality = "desktop"
-}: {
-  onClose: () => void;
-  quality?: "desktop" | "mobile";
-}) {
-  const [t, setT] = useState(1);
-  const [showLabels, setShowLabels] = useState(true);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [mode, setMode] = useState<SocMode>("Idle");
-  const cameraRef = useRef<THREE.Camera | null>(null);
+  mode,
+  setMode,
+  t,
+  setT,
+  showLabels,
+  setShowLabels,
+  selected,
+  setSelected,
+  onZoom,
+  onResetView,
+}: PlaygroundOverlayProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -64,49 +72,18 @@ export function PlaygroundOverlay({
     return u ? u[mode] : 0;
   }, [sel, mode]);
 
-  const zoom = (factor: number) => {
-    if (!cameraRef.current) return;
-    const cam = cameraRef.current;
-    const len = cam.position.length();
-    const next = Math.min(68, Math.max(16, len * factor));
-    cam.position.multiplyScalar(next / len);
-    cam.updateMatrixWorld(true);
-  };
-
   return (
     <div
-      className={`fixed inset-0 z-50 overflow-hidden bg-[#0b0d12] font-sans text-white select-none transition-all duration-500 ease-in-out ${
-        mounted ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
+      className={`fixed inset-0 z-50 overflow-hidden font-sans text-white select-none transition-all duration-500 ease-in-out ${
+        mounted ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
+      style={{ pointerEvents: "none" }}
     >
-      {/* ambient gradient */}
-      <div
-        className="pointer-events-none absolute inset-0 z-1"
-        style={{
-          background:
-            "radial-gradient(900px 600px at 10% 8%, rgba(91,124,250,0.05), transparent 55%), radial-gradient(700px 500px at 92% 88%, rgba(100,140,220,0.04), transparent 55%)",
-        }}
-      />
-
-      <div className="absolute inset-0 z-0">
-        <Canvas
-          shadows={quality === "desktop"}
-          dpr={quality === "desktop" ? [1, 2] : 1}
-          camera={{ position: [20, 16, 22], fov: 25 }}
-          gl={{ antialias: quality === "desktop", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
-          className="absolute inset-0"
-        >
-          <QualityContext.Provider value={quality}>
-            <Suspense fallback={null}>
-              <PlaygroundScene t={t} showLabels={showLabels} selected={selected} setSelected={setSelected} mode={mode} />
-              <CameraController cameraRef={cameraRef} />
-            </Suspense>
-          </QualityContext.Provider>
-        </Canvas>
-      </div>
-
       {/* ───── Top bar: logo + modes + view toggle + close ───── */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent">
+      <div
+        className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent"
+        style={{ pointerEvents: "auto" }}
+      >
         {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div>
@@ -172,7 +149,10 @@ export function PlaygroundOverlay({
       </div>
 
       {/* ───── Left: legend ───── */}
-      <div className="absolute left-5 top-24 z-10 w-44 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]">
+      <div
+        className="absolute left-5 top-24 z-10 w-44 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
+        style={{ pointerEvents: "auto" }}
+      >
         <div className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white/40">
           Domains
         </div>
@@ -191,7 +171,10 @@ export function PlaygroundOverlay({
 
       {/* ───── Right: diagnostics panel (only when a block is selected) ───── */}
       {sel && (
-        <div className="absolute right-5 top-24 z-10 w-72 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] shadow-[0_2px_6px_rgba(0,0,0,0.4),0_12px_32px_rgba(0,0,0,0.35)] overflow-hidden">
+        <div
+          className="absolute right-5 top-24 z-10 w-72 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] shadow-[0_2px_6px_rgba(0,0,0,0.4),0_12px_32px_rgba(0,0,0,0.35)] overflow-hidden"
+          style={{ pointerEvents: "auto" }}
+        >
           {/* header */}
           <div className="border-b border-white/8 p-4 pb-3">
             <div className="flex items-start justify-between">
@@ -249,7 +232,10 @@ export function PlaygroundOverlay({
       )}
 
       {/* ───── Bottom-left: explode slider ───── */}
-      <div className="absolute bottom-5 left-5 z-10 w-56 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]">
+      <div
+        className="absolute bottom-5 left-5 z-10 w-56 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
+        style={{ pointerEvents: "auto" }}
+      >
         <div className="flex items-center justify-between mb-2">
           <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-white/40">
             Explode
@@ -284,7 +270,7 @@ export function PlaygroundOverlay({
         </button>
         <div className="mt-2 flex items-center justify-between">
           <button
-            onClick={() => { if (cameraRef.current) { cameraRef.current.position.set(20, 16, 22); cameraRef.current.updateMatrixWorld(true); }}}
+            onClick={onResetView}
             className="text-[10px] text-white/40 hover:text-white/70 transition-colors cursor-pointer"
           >
             Reset view
@@ -296,23 +282,23 @@ export function PlaygroundOverlay({
       </div>
 
       {/* ───── Bottom-right: zoom controls ───── */}
-      <div className="absolute right-5 bottom-5 z-10 flex flex-col gap-1.5">
+      <div className="absolute right-5 bottom-5 z-10 flex flex-col gap-1.5" style={{ pointerEvents: "auto" }}>
         <button
-          onClick={() => zoom(0.82)}
+          onClick={() => onZoom(0.82)}
           aria-label="Zoom in"
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[rgba(15,18,26,0.94)] text-white/55 text-sm hover:text-white/90 hover:border-white/25 transition-colors cursor-pointer"
         >
           +
         </button>
         <button
-          onClick={() => { if (cameraRef.current) { cameraRef.current.position.set(20, 16, 22); cameraRef.current.updateMatrixWorld(true); }}}
+          onClick={onResetView}
           aria-label="Reset zoom"
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[rgba(15,18,26,0.94)] text-white/55 hover:text-white/90 hover:border-white/25 transition-colors cursor-pointer"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" /></svg>
         </button>
         <button
-          onClick={() => zoom(1.2)}
+          onClick={() => onZoom(1.2)}
           aria-label="Zoom out"
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[rgba(15,18,26,0.94)] text-white/55 text-sm hover:text-white/90 hover:border-white/25 transition-colors cursor-pointer"
         >
