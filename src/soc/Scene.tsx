@@ -21,6 +21,7 @@ import {
 
 // Physical copper-gold tone for metal interconnect (vias, buses, scribe rails).
 const AMBER = "#c79a4e";
+const DATASTREAM_COLORS = ["#ff007f", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#ec4899", "#06b6d4", "#f97316"];
 
 function getUtil(id: string, mode: SocMode): number {
   const table = UTILIZATION[id];
@@ -256,8 +257,7 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
   const opacityMultiplier = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.55); // fades out quickly
 
   const packetRefs = useRef<THREE.Mesh[]>([]);
-
-  const colors = ["#ff007f", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#ec4899", "#06b6d4", "#f97316"];
+  const packetPosition = useMemo(() => new THREE.Vector3(), []);
 
   const paths = useMemo(() => {
     const list = [];
@@ -283,12 +283,20 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
       mid.y += 4 + Math.random() * 5; // arched curve
 
       const curve = new THREE.CatmullRomCurve3([start, mid, end]);
+      const points = curve.getPoints(30);
+      const positionBuffer = new Float32Array(points.length * 3);
+      points.forEach((point, pointIndex) => {
+        const offset = pointIndex * 3;
+        positionBuffer[offset] = point.x;
+        positionBuffer[offset + 1] = point.y;
+        positionBuffer[offset + 2] = point.z;
+      });
       list.push({
         curve,
-        color: colors[i % colors.length],
+        color: DATASTREAM_COLORS[i % DATASTREAM_COLORS.length],
         speed: 0.85 + Math.random() * 0.7, // much faster
         offset: Math.random(),
-        points: curve.getPoints(30),
+        positionBuffer,
       });
     }
     return list;
@@ -302,8 +310,8 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
       const tVal = (time * path.speed + path.offset) % 1.0;
       const mesh = packetRefs.current[i];
       if (mesh) {
-        const pos = path.curve.getPointAt(tVal);
-        mesh.position.copy(pos);
+        path.curve.getPointAt(tVal, packetPosition);
+        mesh.position.copy(packetPosition);
       }
     });
   });
@@ -319,7 +327,7 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
             <bufferGeometry attach="geometry">
               <float32BufferAttribute
                 attach="attributes-position"
-                args={[new Float32Array(path.points.flatMap(p => [p.x, p.y, p.z])), 3]}
+                args={[path.positionBuffer, 3]}
               />
             </bufferGeometry>
             <lineBasicMaterial
@@ -462,6 +470,8 @@ function CameraController({
 }) {
   const { camera } = useThree();
   const targetRef = useRef(new THREE.Vector3(0, 1.5, 0));
+  const driftRef = useRef(new THREE.Vector3());
+  const finalPosRef = useRef(new THREE.Vector3());
 
   const mouse = useRef(new THREE.Vector2(0, 0));
   const parallax = useRef({ x: 0, y: 0 });
@@ -497,9 +507,8 @@ function CameraController({
     parallax.current.x += (targetPX - parallax.current.x) * 0.04;
     parallax.current.y += (targetPY - parallax.current.y) * 0.04;
 
-    const finalPos = targetParams.position.clone().add(
-      new THREE.Vector3(driftX + parallax.current.x, driftY + parallax.current.y, driftZ)
-    );
+    driftRef.current.set(driftX + parallax.current.x, driftY + parallax.current.y, driftZ);
+    const finalPos = finalPosRef.current.copy(targetParams.position).add(driftRef.current);
 
     // Heavy cinematic easing: lerp position and lookAt target at slightly different rates
     camera.position.lerp(finalPos, 0.045);
@@ -627,19 +636,37 @@ export function Scene({
   uiTransitionRef,
 }: SceneProps) {
   const [levelFloat, setLevelFloat] = useState(targetLevel);
+  const levelFloatRef = useRef(targetLevel);
 
   useEffect(() => {
-    let raf: number;
+    let raf: number | undefined;
+    let cancelled = false;
+
     const ease = () => {
-      setLevelFloat((prev) => {
-        const diff = targetLevel - prev;
-        if (Math.abs(diff) < 0.02) return targetLevel; // snap & settle
-        return Math.round((prev + diff * 0.12) * 50) / 50;
-      });
+      const prev = levelFloatRef.current;
+      const diff = targetLevel - prev;
+
+      if (Math.abs(diff) < 0.02) {
+        if (prev !== targetLevel) {
+          levelFloatRef.current = targetLevel;
+          setLevelFloat(targetLevel);
+        }
+        return;
+      }
+
+      const nextPrecise = prev + diff * 0.12;
+      levelFloatRef.current = nextPrecise;
+      setLevelFloat(Math.round(nextPrecise * 50) / 50);
+
+      if (cancelled) return;
       raf = requestAnimationFrame(ease);
     };
+
     raf = requestAnimationFrame(ease);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelled = true;
+      if (raf !== undefined) cancelAnimationFrame(raf);
+    };
   }, [targetLevel]);
   const quality = useQuality();
   const isMobile = quality === "mobile";

@@ -5,6 +5,8 @@ import { Html } from "@react-three/drei";
 import { accentFor, BLOCKS, TRAFFIC_PATHS, SocMode } from "./data";
 import { useQuality } from "./quality";
 
+const BLOCK_BY_ID = new Map(BLOCKS.map((block) => [block.id, block]));
+
 /* ---------- shader: a thin tube with a flowing gradient ---------- */
 
 const flowVertex = /* glsl */ `
@@ -45,20 +47,30 @@ const flowFragment = /* glsl */ `
 `;
 
 function FlowTube({
-  from,
-  to,
+  fromX,
+  fromY,
+  fromZ,
+  toX,
+  toY,
+  toZ,
   color,
   bandwidth,
 }: {
-  from: THREE.Vector3;
-  to: THREE.Vector3;
+  fromX: number;
+  fromY: number;
+  fromZ: number;
+  toX: number;
+  toY: number;
+  toZ: number;
   color: string;
   bandwidth?: string;
 }) {
   const matRef = useRef<THREE.ShaderMaterial>(null!);
   const isMobile = useQuality() === "mobile";
 
-  const { tubeGeo, curve, midPoint } = useMemo(() => {
+  const { tubeGeo, curve, midPoint, fromPoint, toPoint } = useMemo(() => {
+    const from = new THREE.Vector3(fromX, fromY, fromZ);
+    const to = new THREE.Vector3(toX, toY, toZ);
     const distance = from.distanceTo(to);
     const arcHeight = 1.2 + Math.min(4.5, distance * 0.14);
     const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
@@ -67,8 +79,8 @@ function FlowTube({
     const c = new THREE.QuadraticBezierCurve3(from.clone(), mid, to.clone());
     // Far fewer tube/ring segments on mobile.
     const geo = new THREE.TubeGeometry(c, isMobile ? 24 : 60, 0.045, isMobile ? 5 : 8, false);
-    return { tubeGeo: geo, curve: c, midPoint: mid };
-  }, [from, to, isMobile]);
+    return { tubeGeo: geo, curve: c, midPoint: mid, fromPoint: from, toPoint: to };
+  }, [fromX, fromY, fromZ, toX, toY, toZ, isMobile]);
 
   const uniforms = useMemo(
     () => ({
@@ -82,6 +94,7 @@ function FlowTube({
 
   const headRef = useRef<THREE.Mesh>(null!);
   const headHaloRef = useRef<THREE.Mesh>(null!);
+  const pulsePosition = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
@@ -89,10 +102,10 @@ function FlowTube({
 
     // single elegant leading pulse traveling along the curve
     const t = (time * 0.35) % 1;
-    const p = curve.getPointAt(t);
-    if (headRef.current) headRef.current.position.copy(p);
+    curve.getPointAt(t, pulsePosition);
+    if (headRef.current) headRef.current.position.copy(pulsePosition);
     if (!isMobile && headHaloRef.current) {
-      headHaloRef.current.position.copy(p);
+      headHaloRef.current.position.copy(pulsePosition);
       const s = 1 + Math.sin(time * 4) * 0.08;
       headHaloRef.current.scale.setScalar(s);
     }
@@ -127,11 +140,11 @@ function FlowTube({
             <meshBasicMaterial color={color} transparent opacity={0.18} depthWrite={false} blending={THREE.AdditiveBlending} />
           </mesh>
 
-          <mesh position={from}>
+          <mesh position={fromPoint}>
             <ringGeometry args={[0.14, 0.2, 24]} />
             <meshBasicMaterial color={color} transparent opacity={0.55} side={THREE.DoubleSide} depthWrite={false} />
           </mesh>
-          <mesh position={to}>
+          <mesh position={toPoint}>
             <ringGeometry args={[0.14, 0.2, 24]} />
             <meshBasicMaterial color={color} transparent opacity={0.55} side={THREE.DoubleSide} depthWrite={false} />
           </mesh>
@@ -182,22 +195,23 @@ export function TrafficNetwork({ mode, t }: { mode: SocMode; t: number }) {
   return (
     <group>
       {paths.map((path) => {
-        const from = BLOCKS.find((b) => b.id === path.from);
-        const to = BLOCKS.find((b) => b.id === path.to);
+        const from = BLOCK_BY_ID.get(path.from);
+        const to = BLOCK_BY_ID.get(path.to);
         if (!from || !to) return null;
 
         // attach to the top of each block, scaled by current explode amount
         const yFrom = t * from.lift + from.h + 0.15;
         const yTo = t * to.lift + to.h + 0.15;
 
-        const start = new THREE.Vector3(from.cx, yFrom, from.cz);
-        const end = new THREE.Vector3(to.cx, yTo, to.cz);
-
         return (
           <FlowTube
             key={`${path.from}-${path.to}-${mode}`}
-            from={start}
-            to={end}
+            fromX={from.cx}
+            fromY={yFrom}
+            fromZ={from.cz}
+            toX={to.cx}
+            toY={yTo}
+            toZ={to.cz}
             color={accentFor(from)}
             bandwidth={SOURCE_BANDWIDTH[from.id]}
           />

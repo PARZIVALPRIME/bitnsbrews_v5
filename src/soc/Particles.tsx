@@ -76,6 +76,10 @@ export function Particles({ count = 400, color = "#c79a4e", levelFloat }: Partic
   const matRef = useRef<THREE.ShaderMaterial>(null!);
   const { camera } = useThree();
 
+  // Fade out particles when zooming deep inside Level 5 (The Hub) to keep overlays readable.
+  // When fully inactive, keep the component mounted but skip uniform writes.
+  const particlesVisible = Math.max(0, 1.0 - Math.max(0, levelFloat - 4.2) * 1.25) > 0.001;
+
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
@@ -106,6 +110,8 @@ export function Particles({ count = 400, color = "#c79a4e", levelFloat }: Partic
   }, [count]);
 
   useFrame((state) => {
+    if (!particlesVisible) return;
+
     const time = state.clock.getElapsedTime();
     if (matRef.current) {
       matRef.current.uniforms.uTime.value = time;
@@ -113,10 +119,7 @@ export function Particles({ count = 400, color = "#c79a4e", levelFloat }: Partic
     }
   });
 
-  // Fade out particles when zooming deep inside Level 5 (The Hub) to keep overlays readable
-  const opacityMultiplier = Math.max(0, 1.0 - Math.max(0, levelFloat - 4.2) * 1.25);
-
-  if (opacityMultiplier <= 0.001) return null;
+  if (!particlesVisible) return null;
 
   return (
     <instancedMesh ref={meshRef} args={[null as any, null as any, count]} frustumCulled={false}>
