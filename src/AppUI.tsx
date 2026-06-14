@@ -613,27 +613,35 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: "none",
         }}
       >
-        <div className={`${EYEBROW} text-[#8aa9ff] mb-2.5`}>
-          Chapter {currentChapter.chapter}
+        <div
+          style={{
+            opacity: chapterVisible ? 1 : 0,
+            transform: chapterVisible ? "translate3d(0, 0, 0)" : "translate3d(0, 6px, 0)",
+            transition: "opacity 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+        >
+          <div className={`${EYEBROW} text-[#8aa9ff] mb-2.5`}>
+            Chapter {currentChapter.chapter}
+          </div>
+          <h1 className="text-[28px] font-semibold leading-none tracking-tight text-white/92 mb-1.5">
+            {currentChapter.title}
+          </h1>
+          <div className="text-[12px] text-white/45 mb-3.5">
+            {currentChapter.subtitle}
+          </div>
+          <p className="text-[12.5px] leading-[1.7] text-white/60 max-w-[340px]">
+            {currentChapter.description}
+          </p>
+          {activeChapterLevel === 3 && (
+            <button
+              onClick={() => setShowPlayground(true)}
+              className="mt-5 flex items-center gap-2 rounded-lg bg-[#5b7cfa] hover:bg-[#6d8cfb] text-white font-medium text-[12px] px-5 py-2.5 transition-colors duration-200 cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
+            >
+              <span>Open the interactive die</span>
+              <span aria-hidden>&rarr;</span>
+            </button>
+          )}
         </div>
-        <h1 className="text-[28px] font-semibold leading-none tracking-tight text-white/92 mb-1.5">
-          {currentChapter.title}
-        </h1>
-        <div className="text-[12px] text-white/45 mb-3.5">
-          {currentChapter.subtitle}
-        </div>
-        <p className="text-[12.5px] leading-[1.7] text-white/60 max-w-[340px]">
-          {currentChapter.description}
-        </p>
-        {activeChapterLevel === 3 && (
-          <button
-            onClick={() => setShowPlayground(true)}
-            className="mt-5 flex items-center gap-2 rounded-lg bg-[#5b7cfa] hover:bg-[#6d8cfb] text-white font-medium text-[12px] px-5 py-2.5 transition-colors duration-200 cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
-          >
-            <span>Open the interactive die</span>
-            <span aria-hidden>&rarr;</span>
-          </button>
-        )}
       </div>
       
       {/* ── Right: Detail panel (level 3 selected block) ── */}
@@ -992,6 +1000,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       {activeComponentPortal && (
         <ComponentPortal
           componentId={activeComponentPortal}
+          isReaderOpen={!!readerArticleId}
           onClose={() => {
             setActiveComponentPortal(null);
             setSelectedBlock(null);

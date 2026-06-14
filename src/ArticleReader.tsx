@@ -235,7 +235,7 @@ export function ArticleReader({ article, onClose, onNavigate }: { article: Artic
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-[#0b0d12] origin-center"
+      className="fixed inset-0 z-[60] bg-[#0b0d12]/92 backdrop-blur-md origin-center"
       style={{
         opacity: entered && !closing ? 1 : 0,
         transform: entered && !closing ? "scale(1) translate3d(0, 0, 0)" : "scale(0.98) translate3d(0, 32px, 0)",

@@ -4,6 +4,7 @@ import { DOMAIN_ACCENTS } from "./soc/data";
 
 interface ComponentPortalProps {
   componentId: string;
+  isReaderOpen?: boolean;
   onClose: () => void;
   onReadArticle: (articleId: string) => void;
 }
@@ -116,13 +117,14 @@ function SpecRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ComponentPortal({ componentId, onClose, onReadArticle }: ComponentPortalProps) {
+export function ComponentPortal({ componentId, isReaderOpen = false, onClose, onReadArticle }: ComponentPortalProps) {
   const [entered, setEntered] = useState(false);
   const [closing, setClosing] = useState(false);
   const [hoveredStep, setHoveredStep] = useState<number | null>(null);
   const comp = getComponent(componentId);
 
   const handleClose = () => {
+    if (isReaderOpen) return; // Prevent escape/clicks while reader is open
     setClosing(true);
     setEntered(false);
     setTimeout(() => {
@@ -132,7 +134,7 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
 
   // Shared motion curve — same expo ease the rest of the app uses.
   const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
-  const open = entered && !closing;
+  const open = entered && !closing && !isReaderOpen;
 
   useEffect(() => {
     // A slightly longer timeout guarantees the browser registers the mounting state
@@ -162,6 +164,7 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
         transitionProperty: "opacity",
         transitionDuration: closing ? "260ms" : "340ms",
         transitionTimingFunction: "ease-out",
+        pointerEvents: open ? "auto" : "none",
       }}
       onClick={handleClose}
     >
@@ -174,7 +177,9 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
             ? "scale(1) translate3d(0, 0, 0)"
             : closing
               ? "scale(0.97) translate3d(0, 10px, 0)"
-              : "scale(0.96) translate3d(0, 14px, 0)",
+              : isReaderOpen
+                ? "scale(0.97) translate3d(0, -12px, 0)"
+                : "scale(0.96) translate3d(0, 14px, 0)",
           transitionProperty: "opacity, transform",
           transitionDuration: closing ? "300ms" : "460ms",
           transitionTimingFunction: EASE,
