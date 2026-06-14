@@ -276,14 +276,31 @@ export function SocBlock({
         {visMode !== "thermal" && (
           <mesh position={[0, h + 0.025, 0]}>
             <boxGeometry args={[Math.max(0.12, w - 0.08), 0.05, Math.max(0.12, d - 0.08)]} />
-            <meshStandardMaterial
-              ref={capMat}
-              color={block.base}
-              metalness={visMode === "logical" ? 0.95 : Math.min(0.95, block.metalness * 1.45)}
-              roughness={visMode === "logical" ? 0.15 : Math.max(0.12, block.roughness * 0.45)}
-              transparent={visMode === "logical" || dimmed}
-              opacity={(dimmed ? (isMobile ? 0.35 : 0.15) + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1) * opacity}
-            />
+            {isMobile ? (
+              <meshStandardMaterial
+                ref={capMat}
+                color={block.base}
+                metalness={visMode === "logical" ? 0.95 : Math.min(0.95, block.metalness * 1.45)}
+                roughness={visMode === "logical" ? 0.15 : Math.max(0.12, block.roughness * 0.45)}
+                transparent={visMode === "logical" || dimmed}
+                opacity={(dimmed ? 0.35 + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1) * opacity}
+              />
+            ) : (
+              // Iridescent silicon cap: thin-film sheen that shifts with the camera.
+              <meshPhysicalMaterial
+                ref={capMat as any}
+                color={block.base}
+                metalness={visMode === "logical" ? 0.95 : Math.min(0.95, block.metalness * 1.45)}
+                roughness={visMode === "logical" ? 0.15 : Math.max(0.12, block.roughness * 0.45)}
+                iridescence={visMode === "logical" ? 0 : 1}
+                iridescenceIOR={1.8}
+                iridescenceThicknessRange={[130, 680]}
+                clearcoat={0.6}
+                clearcoatRoughness={0.35}
+                transparent={visMode === "logical" || dimmed}
+                opacity={(dimmed ? 0.15 + selectCur.current * 0.65 : visMode === "logical" ? 0.45 : 1) * opacity}
+              />
+            )}
           </mesh>
         )}
 

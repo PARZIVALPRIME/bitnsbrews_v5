@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { useMemo, useRef, useEffect, useState, memo } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Lightformer, Edges, ContactShadows } from "@react-three/drei";
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, Vignette, SMAA, N8AO } from "@react-three/postprocessing";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { BLOCKS, DIE_W, DIE_D, SocMode, UTILIZATION } from "./data";
 import { ARTICLE_BLOCK_IDS } from "../articles";
 import { SocBlock } from "./SocBlock";
@@ -250,6 +251,203 @@ function DieIOPins({ dieW, dieD, opacity }: { dieW: number; dieD: number; opacit
   return <instancedMesh ref={ref} args={[pinGeometry, _pinMat, pinsData.length]} />;
 }
 
+/* =========================================================================
+   DIE-EDGE REALISM: wire-bond pad ring, double seal ring, alignment crosses,
+   and an etched die ID — the "tells" that read as a real fabricated die.
+   ========================================================================= */
+const _bondPadGeo = new THREE.BoxGeometry(0.16, 0.05, 0.16);
+const _bondPadMat = new THREE.MeshStandardMaterial({
+  color: "#e7c270",
+  emissive: "#d4af37",
+  emissiveIntensity: 0.5,
+  metalness: 1,
+  roughness: 0.18,
+  transparent: true,
+});
+
+function DieSurfaceMarks({ dieW, dieD, opacity }: { dieW: number; dieD: number; opacity: number }) {
+  const padRef = useRef<THREE.InstancedMesh>(null!);
+  const cx = dieW / 2 - 0.5;
+  const cz = dieD / 2 - 0.5;
+
+  const padPositions = useMemo(() => {
+    const list: THREE.Vector3[] = [];
+    const step = 0.5;
+    const y = 0.05;
+    for (let x = -cx + 0.4; x <= cx - 0.4; x += step) {
+      list.push(new THREE.Vector3(x, y, -cz));
+      list.push(new THREE.Vector3(x, y, cz));
+    }
+    for (let z = -cz + 0.4; z <= cz - 0.4; z += step) {
+      list.push(new THREE.Vector3(-cx, y, z));
+      list.push(new THREE.Vector3(cx, y, z));
+    }
+    return list;
+  }, [cx, cz]);
+
+  useEffect(() => {
+    const dummy = new THREE.Object3D();
+    padPositions.forEach((p, i) => {
+      dummy.position.copy(p);
+      dummy.updateMatrix();
+      padRef.current.setMatrixAt(i, dummy.matrix);
+    });
+    padRef.current.instanceMatrix.needsUpdate = true;
+  }, [padPositions]);
+
+  useEffect(() => {
+    _bondPadMat.opacity = opacity;
+    _bondPadMat.needsUpdate = true;
+  }, [opacity]);
+
+  // Etched die ID in a corner (canvas texture — no external font dependency).
+  const dieId = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 256;
+    c.height = 96;
+    const ctx = c.getContext("2d")!;
+    ctx.clearRect(0, 0, 256, 96);
+    ctx.fillStyle = "#9c8038";
+    ctx.font = "bold 34px ui-monospace, Menlo, monospace";
+    ctx.textBaseline = "middle";
+    ctx.fillText("BNB-N3", 8, 30);
+    ctx.font = "20px ui-monospace, Menlo, monospace";
+    ctx.fillStyle = "#6a5a30";
+    ctx.fillText("© 2026", 8, 66);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    return tex;
+  }, []);
+
+  const crosses = [
+    [cx, cz],
+    [-cx, cz],
+    [cx, -cz],
+    [-cx, -cz],
+  ] as const;
+
+  return (
+    <group>
+      {/* Wire-bond pad ring just inside the seal ring (instanced — 1 draw call) */}
+      <instancedMesh ref={padRef} args={[_bondPadGeo, _bondPadMat, padPositions.length]} />
+
+      {/* Inner seal ring — makes the perimeter a believable double seal ring */}
+      {[
+        [0, 0.04, -cz - 0.08, dieW - 0.6, 0.03, 0.04] as const,
+        [0, 0.04, cz + 0.08, dieW - 0.6, 0.03, 0.04] as const,
+        [-cx - 0.08, 0.04, 0, 0.04, 0.03, dieD - 0.6] as const,
+        [cx + 0.08, 0.04, 0, 0.04, 0.03, dieD - 0.6] as const,
+      ].map(([x, y, z, w, hh, dd], i) => (
+        <mesh key={`seal-${i}`} position={[x, y, z]}>
+          <boxGeometry args={[w, hh, dd]} />
+          <meshStandardMaterial color={AMBER} emissive={AMBER} emissiveIntensity={0.5 * opacity} metalness={1} roughness={0.2} transparent opacity={0.7 * opacity} />
+        </mesh>
+      ))}
+
+      {/* Corner alignment crosses */}
+      {crosses.map(([px, pz], i) => (
+        <group key={`x-${i}`} position={[px, 0.06, pz]}>
+          <mesh>
+            <boxGeometry args={[0.34, 0.03, 0.06]} />
+            <meshStandardMaterial color="#e7c270" emissive={AMBER} emissiveIntensity={0.7 * opacity} metalness={1} roughness={0.15} transparent opacity={opacity} />
+          </mesh>
+          <mesh>
+            <boxGeometry args={[0.06, 0.03, 0.34]} />
+            <meshStandardMaterial color="#e7c270" emissive={AMBER} emissiveIntensity={0.7 * opacity} metalness={1} roughness={0.15} transparent opacity={opacity} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Etched die ID near the −X/−Z corner */}
+      <mesh position={[-cx + 1.4, 0.06, -cz + 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[2.4, 0.9]} />
+        <meshStandardMaterial map={dieId} emissiveMap={dieId} emissive="#ffffff" emissiveIntensity={0.45 * opacity} transparent opacity={0.85 * opacity} />
+      </mesh>
+    </group>
+  );
+}
+
+/* =========================================================================
+   BOND WIRES + FINGERS: dense gold wires fanning from the die out to a comb of
+   bond fingers — the decapped-package look from real silicon photos.
+   ========================================================================= */
+const _fingerGeo = new THREE.BoxGeometry(0.62, 0.04, 0.12);
+const _fingerMat = new THREE.MeshStandardMaterial({
+  color: "#e7c270",
+  emissive: "#d4af37",
+  emissiveIntensity: 0.4,
+  metalness: 1,
+  roughness: 0.2,
+  transparent: true,
+});
+
+function DieBondFingers({ dieHX, dieHZ, opacity }: { dieHX: number; dieHZ: number; opacity: number }) {
+  const ref = useRef<THREE.InstancedMesh>(null!);
+  const data = useMemo(() => {
+    const list: { x: number; z: number; rot: number }[] = [];
+    const step = 0.4;
+    const ox = dieHX + 0.6, oz = dieHZ + 0.6;
+    for (let x = -dieHX + 0.3; x <= dieHX - 0.3; x += step) {
+      list.push({ x, z: -oz, rot: Math.PI / 2 });
+      list.push({ x, z: oz, rot: Math.PI / 2 });
+    }
+    for (let z = -dieHZ + 0.3; z <= dieHZ - 0.3; z += step) {
+      list.push({ x: -ox, z, rot: 0 });
+      list.push({ x: ox, z, rot: 0 });
+    }
+    return list;
+  }, [dieHX, dieHZ]);
+
+  useEffect(() => {
+    const dummy = new THREE.Object3D();
+    data.forEach((f, i) => {
+      dummy.position.set(f.x, -0.5, f.z);
+      dummy.rotation.set(0, f.rot, 0);
+      dummy.updateMatrix();
+      ref.current.setMatrixAt(i, dummy.matrix);
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
+  }, [data]);
+
+  useEffect(() => {
+    _fingerMat.opacity = opacity;
+    _fingerMat.needsUpdate = true;
+  }, [opacity]);
+
+  return <instancedMesh ref={ref} args={[_fingerGeo, _fingerMat, data.length]} />;
+}
+
+function DieBondWires({ dieHX, dieHZ, opacity }: { dieHX: number; dieHZ: number; opacity: number }) {
+  const geo = useMemo(() => {
+    const tubes: THREE.TubeGeometry[] = [];
+    const add = (x1: number, z1: number, x2: number, z2: number) => {
+      const start = new THREE.Vector3(x1, 0.06, z1);
+      const end = new THREE.Vector3(x2, -0.46, z2);
+      const mid = new THREE.Vector3((x1 + x2) / 2, 0.55, (z1 + z2) / 2);
+      const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+      tubes.push(new THREE.TubeGeometry(curve, 12, 0.024, 5, false));
+    };
+    const step = 0.34;
+    const iX = dieHX - 0.15, oX = dieHX + 0.6;
+    const iZ = dieHZ - 0.15, oZ = dieHZ + 0.6;
+    for (let x = -dieHX + 0.3; x <= dieHX - 0.3; x += step) {
+      add(x, -iZ, x, -oZ);
+      add(x, iZ, x, oZ);
+    }
+    for (let z = -dieHZ + 0.3; z <= dieHZ - 0.3; z += step) {
+      add(-iX, z, -oX, z);
+      add(iX, z, oX, z);
+    }
+    return mergeGeometries(tubes) ?? new THREE.BufferGeometry();
+  }, [dieHX, dieHZ]);
+
+  return (
+    <mesh geometry={geo}>
+      <meshStandardMaterial color="#e7c270" emissive="#d4af37" emissiveIntensity={0.5 * opacity} metalness={1} roughness={0.22} transparent opacity={opacity} />
+    </mesh>
+  );
+}
+
 function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
   const quality = useQuality();
   const streamCount = quality === "mobile" ? 16 : 36;
@@ -364,6 +562,7 @@ function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
    DIE SUBSTRATE & BASE
    ========================================================================= */
 function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
+  const isMobile = useQuality() === "mobile";
   const dieW = DIE_W + 1.4;
   const dieD = DIE_D + 1.4;
   const rail = 0.14;
@@ -417,13 +616,23 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
         <>
           <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
             <planeGeometry args={[dieW - 0.3, dieD - 0.3]} />
-            <meshStandardMaterial
-              color="#060910"
-              metalness={0.3}
-              roughness={0.8}
-              transparent
-              opacity={opacity}
-            />
+            {isMobile ? (
+              <meshStandardMaterial color="#060910" metalness={0.3} roughness={0.8} transparent opacity={opacity} />
+            ) : (
+              // Bare-silicon thin-film sheen: the rainbow diffraction of a real die.
+              <meshPhysicalMaterial
+                color="#070b14"
+                metalness={0.6}
+                roughness={0.42}
+                iridescence={1}
+                iridescenceIOR={1.9}
+                iridescenceThicknessRange={[140, 720]}
+                clearcoat={0.5}
+                clearcoatRoughness={0.45}
+                transparent
+                opacity={opacity}
+              />
+            )}
           </mesh>
           <DieInterconnects opacity={opacity} />
         </>
@@ -448,8 +657,17 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
           />
         </mesh>
       ))}
-      {/* Input Output pins at the edges of the die */}
-      <DieIOPins dieW={dieW} dieD={dieD} opacity={opacity} />
+      {/* Die-edge realism: bond pads, double seal ring, alignment crosses, die ID */}
+      <DieSurfaceMarks dieW={dieW} dieD={dieD} opacity={opacity} />
+
+      {/* Decap look: dense gold bond wires + finger comb from die to package.
+          Replaces the gull-wing legs. Desktop only (merged-tube geometry). */}
+      {!isMobile && (
+        <>
+          <DieBondFingers dieHX={dieW / 2} dieHZ={dieD / 2} opacity={opacity} />
+          <DieBondWires dieHX={dieW / 2} dieHZ={dieD / 2} opacity={opacity} />
+        </>
+      )}
     </group>
   );
 }
@@ -707,11 +925,15 @@ export function Scene({
       <Lights visMode={visMode} levelFloat={levelFloat} />
 
       {!isMobile ? (
-        <Environment resolution={128} frames={1}>
+        <Environment resolution={256} frames={1}>
           <Lightformer intensity={1.4} color="#ffdca8" position={[-10, 8, 6]} scale={[10, 10, 1]} />
           <Lightformer intensity={0.6} color="#8aa0e0" position={[12, 6, -6]} scale={[8, 8, 1]} />
           <Lightformer intensity={0.8} color="#ffb878" position={[0, 5, -14]} scale={[12, 4, 1]} />
           <Lightformer intensity={0.35} color="#e0ddd8" position={[0, 14, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[22, 22, 1]} />
+          {/* Extra soft strips + ring give the iridescent silicon moving reflections */}
+          <Lightformer intensity={0.5} color="#bcd0ff" position={[-6, 4, 10]} scale={[6, 6, 1]} />
+          <Lightformer intensity={0.45} color="#ffd0a0" position={[8, 3, 9]} scale={[6, 6, 1]} />
+          <Lightformer form="ring" intensity={0.6} color="#ffffff" position={[0, 11, 6]} scale={[10, 10, 1]} />
         </Environment>
       ) : null}
 
@@ -797,6 +1019,12 @@ export function Scene({
       />
 
       <EffectComposer multisampling={0}>
+        {/* Ambient occlusion: shades the gaps between blocks and where the die
+            meets the package, so the floorplan reads as real recessed geometry
+            instead of flat boxes. Desktop only — half-res to stay cheap. */}
+        {isMobile ? <></> : (
+          <N8AO aoRadius={1.8} distanceFalloff={1.2} intensity={2.4} quality="medium" halfRes />
+        )}
         <Bloom
           intensity={isMobile ? 0.35 : 0.55}
           luminanceThreshold={0.5}
