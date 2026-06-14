@@ -52,6 +52,7 @@ const ParticleShader = {
     varying vec2 vUv;
     varying float vAlpha;
     uniform vec3 uColor;
+    uniform float uOpacityMultiplier;
 
     void main() {
       // Draw a smooth radial gradient circle
@@ -60,7 +61,7 @@ const ParticleShader = {
       
       // Soft edge interpolation
       float intensity = smoothstep(0.5, 0.05, dist);
-      gl_FragColor = vec4(uColor, intensity * vAlpha * 0.35);
+      gl_FragColor = vec4(uColor, intensity * vAlpha * 0.35 * uOpacityMultiplier);
     }
   `
 };
@@ -76,15 +77,12 @@ export function Particles({ count = 400, color = "#c79a4e", levelFloat }: Partic
   const matRef = useRef<THREE.ShaderMaterial>(null!);
   const { camera } = useThree();
 
-  // Fade out particles when zooming deep inside Level 5 (The Hub) to keep overlays readable.
-  // When fully inactive, keep the component mounted but skip uniform writes.
-  const particlesVisible = Math.max(0, 1.0 - Math.max(0, levelFloat - 4.2) * 1.25) > 0.001;
-
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uCameraPos: { value: new THREE.Vector3() },
       uColor: { value: new THREE.Color(color) },
+      uOpacityMultiplier: { value: 1.0 },
     }),
     [color]
   );
@@ -110,16 +108,27 @@ export function Particles({ count = 400, color = "#c79a4e", levelFloat }: Partic
   }, [count]);
 
   useFrame((state) => {
-    if (!particlesVisible) return;
+    // Fade out particles when zooming deep inside Level 4 (The Hub) to keep overlays readable
+    const opacityMultiplier = Math.max(0, 1.0 - Math.max(0, levelFloat - 3.2) * 1.25);
+    
+    if (opacityMultiplier <= 0.001) {
+      if (meshRef.current && meshRef.current.visible) {
+        meshRef.current.visible = false;
+      }
+      return;
+    }
+    
+    if (meshRef.current && !meshRef.current.visible) {
+      meshRef.current.visible = true;
+    }
 
     const time = state.clock.getElapsedTime();
     if (matRef.current) {
       matRef.current.uniforms.uTime.value = time;
       matRef.current.uniforms.uCameraPos.value.copy(camera.position);
+      matRef.current.uniforms.uOpacityMultiplier.value = opacityMultiplier;
     }
   });
-
-  if (!particlesVisible) return null;
 
   return (
     <instancedMesh ref={meshRef} args={[null as any, null as any, count]} frustumCulled={false}>
@@ -136,3 +145,4 @@ export function Particles({ count = 400, color = "#c79a4e", levelFloat }: Partic
     </instancedMesh>
   );
 }
+
