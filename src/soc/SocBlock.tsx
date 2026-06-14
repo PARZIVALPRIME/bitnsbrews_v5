@@ -162,9 +162,16 @@ export function SocBlock({
         }
       }
       
-      const shouldBeVisible = isMobile
-        ? selected
-        : ((block.showLabel && !!track && !dimmed) || selected);
+      let shouldBeVisible = false;
+      if (isMobile) {
+        shouldBeVisible = selected;
+      } else {
+        if (levelFloat <= 2.5) {
+          shouldBeVisible = ((block.showLabel && !!track && !dimmed) || selected);
+        } else {
+          shouldBeVisible = selected || (hovered && !dimmed);
+        }
+      }
       
       if (!shouldBeVisible) {
         labelOpacity = 0.0;
@@ -335,7 +342,7 @@ export function SocBlock({
     ? (playgroundShowLabels && block.showLabel) || selected
     : (level >= 2 && level <= 3) && (isMobile
       ? selected
-      : ((block.showLabel && !!track && !dimmed) || selected));
+      : (block.showLabel && !!track));
 
   return (
     <group position={[cx, 0, cz]}>

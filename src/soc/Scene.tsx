@@ -504,16 +504,16 @@ function CameraController({
     current: new THREE.Vector3(),
     target: new THREE.Vector3(),
     velocity: new THREE.Vector3(),
-    stiffness: 42,
-    damping: 14,
+    stiffness: 85,
+    damping: 18,
   });
 
   const targetSpring = useRef({
     current: new THREE.Vector3(),
     target: new THREE.Vector3(),
     velocity: new THREE.Vector3(),
-    stiffness: 42,
-    damping: 14,
+    stiffness: 85,
+    damping: 18,
   });
 
   // Pre-allocated scratch vectors to avoid per-frame allocations
@@ -562,23 +562,53 @@ function CameraController({
     posSpring.current.target.copy(targetParams.position);
     targetSpring.current.target.copy(targetParams.target);
 
-    // Solve position spring in-place
     const pSpring = posSpring.current;
-    _scratchPosDiff.current.subVectors(pSpring.current, pSpring.target);
-    _scratchPosAccel.current.copy(_scratchPosDiff.current).multiplyScalar(-pSpring.stiffness);
-    _scratchPosVelScaled.current.copy(pSpring.velocity).multiplyScalar(pSpring.damping);
-    _scratchPosAccel.current.sub(_scratchPosVelScaled.current);
-    pSpring.velocity.addScaledVector(_scratchPosAccel.current, dt);
-    pSpring.current.addScaledVector(pSpring.velocity, dt);
-
-    // Solve target spring in-place
     const tSpring = targetSpring.current;
-    _scratchTargetDiff.current.subVectors(tSpring.current, tSpring.target);
-    _scratchTargetAccel.current.copy(_scratchTargetDiff.current).multiplyScalar(-tSpring.stiffness);
-    _scratchTargetVelScaled.current.copy(tSpring.velocity).multiplyScalar(tSpring.damping);
-    _scratchTargetAccel.current.sub(_scratchTargetVelScaled.current);
-    tSpring.velocity.addScaledVector(_scratchTargetAccel.current, dt);
-    tSpring.current.addScaledVector(tSpring.velocity, dt);
+
+    const hasFocus = selectedBlockCoords !== null;
+    const distToTargetPos = pSpring.current.distanceTo(pSpring.target);
+    const distToTargetLook = tSpring.current.distanceTo(tSpring.target);
+    
+    // Direct-drive the camera position and target when not focusing a block to eliminate secondary spring lag.
+    // Eases camera smoothly only when block focus is activated or settling back.
+    const runSolver = hasFocus || 
+                      distToTargetPos > 0.05 || 
+                      distToTargetLook > 0.05 || 
+                      pSpring.velocity.length() > 0.02 || 
+                      tSpring.velocity.length() > 0.02;
+
+    if (!runSolver) {
+      pSpring.current.copy(targetParams.position);
+      tSpring.current.copy(targetParams.target);
+      pSpring.velocity.set(0, 0, 0);
+      tSpring.velocity.set(0, 0, 0);
+    } else {
+      // Solve position spring in-place
+      _scratchPosDiff.current.subVectors(pSpring.current, pSpring.target);
+      _scratchPosAccel.current.copy(_scratchPosDiff.current).multiplyScalar(-pSpring.stiffness);
+      _scratchPosVelScaled.current.copy(pSpring.velocity).multiplyScalar(pSpring.damping);
+      _scratchPosAccel.current.sub(_scratchPosVelScaled.current);
+      pSpring.velocity.addScaledVector(_scratchPosAccel.current, dt);
+      pSpring.current.addScaledVector(pSpring.velocity, dt);
+
+      // Solve target spring in-place
+      _scratchTargetDiff.current.subVectors(tSpring.current, tSpring.target);
+      _scratchTargetAccel.current.copy(_scratchTargetDiff.current).multiplyScalar(-tSpring.stiffness);
+      _scratchTargetVelScaled.current.copy(tSpring.velocity).multiplyScalar(tSpring.damping);
+      _scratchTargetAccel.current.sub(_scratchTargetVelScaled.current);
+      tSpring.velocity.addScaledVector(_scratchTargetAccel.current, dt);
+      tSpring.current.addScaledVector(tSpring.velocity, dt);
+
+      // Snap position and target when very close to settle cleanly
+      if (distToTargetPos < 0.005 && pSpring.velocity.length() < 0.01) {
+        pSpring.current.copy(pSpring.target);
+        pSpring.velocity.set(0, 0, 0);
+      }
+      if (distToTargetLook < 0.005 && tSpring.velocity.length() < 0.01) {
+        tSpring.current.copy(tSpring.target);
+        tSpring.velocity.set(0, 0, 0);
+      }
+    }
 
     // Subtle micro-breathing drift
     const driftX = Math.sin(time * 0.35) * 0.08;
