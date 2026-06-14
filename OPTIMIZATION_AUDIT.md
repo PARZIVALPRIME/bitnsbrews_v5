@@ -319,3 +319,149 @@ Manual visual verification still needed:
 - Hero rainbow datastreams should be checked for unchanged paths, colors, line opacity, packet speed, and glow.
 - Hub level should be checked to confirm particles disappear exactly as before, while no invisible particle uniform work continues.
 - Playground traffic modes should be checked for unchanged tube paths, pulse-head motion, endpoint rings, bandwidth labels, and glow.
+
+## Pass 2 Changes Implemented
+
+Date: 2026-06-14
+
+Files changed in Pass 2:
+
+- `src/AppUI.tsx`
+- `OPTIMIZATION_AUDIT.md`
+- `PERFORMANCE_PASS2_COMPARISON.md`
+
+What was optimized:
+
+- Converted closed overlay surfaces in `src/AppUI.tsx` from eager imports to `React.lazy` import adapters:
+  - `PlaygroundOverlay`
+  - `ArticleReader`
+  - `ComponentPortal`
+  - `TrackPage`
+  - `SearchPalette`
+- Rendered lazy overlays only when their existing open state is active.
+  - `SearchPalette` is now mounted only while `isSearchOpen` is true. Its previous closed render returned `null`, so this preserves the visible closed state while avoiding eager import wiring in split builds.
+- Added fixed-position Suspense fallbacks for opened overlays.
+  - Fullscreen overlays use a dark branded loader matching the boot screen language.
+  - Search uses a compact blurred panel skeleton so opening search does not flash blank.
+
+Visuals intentionally preserved:
+
+- No change to 3D model quality, geometry detail, material quality, shader code, lighting, shadows, bloom, glow, particles, labels, glassmorphism, camera motion, postprocessing, animation timings, or DPR.
+- No changes were made to `vite.config.ts` in this pass.
+- No changes were made to `PlaygroundOverlay`, `PlaygroundScene`, `Scene`, traffic geometry, model materials, shadows, bloom, or postprocessing.
+- Loaded overlay visuals are unchanged after their lazy module resolves; only the transient loading fallback is new.
+
+Verification command results:
+
+- `npm run build`
+  - Passed.
+  - Vite transformed `632` modules.
+  - `vite-plugin-singlefile` inlined `index-C3TNRS7X.js` and `style-BPXlrPUF.css`.
+  - Output: `dist/index.html 1,590.77 kB | gzip: 472.70 kB`.
+- `npx tsc --noEmit`
+  - Failed with pre-existing project errors not introduced by lazy loading.
+  - No new lazy-import prop/type errors were reported.
+  - Existing errors include unused symbols in `src/AppUI.tsx`, missing `uiTransitionRef` on local `SceneProps`, `Block.label`, duplicate `Article` identifiers in `src/ArticleReader.tsx`, and unused imports in footer/icon files.
+- `git diff --check`
+  - Passed with no whitespace errors.
+
+Build/output notes:
+
+- Under the current `vite-plugin-singlefile` deployment, dynamic imports did not produce separate files in `dist/`.
+- `dist/` contains `index.html` plus `images/preetam.png`; no separate overlay chunks survive in the final output.
+- The built `index.html` still contains overlay code, including playground strings, because single-file output folds/inlines the JavaScript payload.
+- Expected current impact: low for transfer size and first download under strict single-file output; possible minor execution deferral depends on how the inlined dynamic modules are evaluated by the generated bundle.
+- Expected later impact if regular split deployment is enabled: high, especially for first-load parse/eval and initial route smoothness, because `PlaygroundOverlay` and secondary overlay surfaces can move out of the initial application chunk.
+
+Manual visual verification still needed:
+
+- Hero loads and looks unchanged.
+- Initial landing visual remains unchanged before opening overlays.
+- Playground opens correctly and does not show an ugly blank flash.
+- Playground graphics, traffic, labels, glow, shadows, and model quality remain unchanged after load.
+- Article reader opens and closes correctly.
+- Search palette opens via button and keyboard shortcut, focuses input, selects articles/tracks, and closes correctly.
+- Component portal and track page behavior remain unchanged.
+- Desktop and mobile viewport sanity checks pass.
+
+## Pass 3 Changes Implemented
+
+Date: 2026-06-14
+
+Files changed in Pass 3:
+
+- `package.json`
+- `vite.config.ts`
+- `OPTIMIZATION_AUDIT.md`
+- `PERFORMANCE_PASS3_COMPARISON.md`
+
+What was optimized:
+
+- Added separate production build scripts while preserving the existing default single-file behavior:
+  - `build`: runs `npm run build:single`
+  - `build:single`: runs `SINGLE_FILE=true vite build`
+  - `build:split`: runs `SINGLE_FILE=false vite build`
+- Made `vite-plugin-singlefile` conditional in `vite.config.ts`.
+  - Single-file builds keep using `viteSingleFile()`.
+  - Split builds omit `viteSingleFile()` and emit normal hashed assets.
+- Added minimal split-build vendor chunking:
+  - `react-vendor` for React/React DOM/Scheduler.
+  - `three-vendor` for Three, React Three Fiber/Drei, React Spring, and postprocessing packages.
+- Preserved the pre-existing local `server.watch` config in `vite.config.ts`.
+
+Visuals intentionally preserved:
+
+- No changes were made to 3D scene code, die/model quality, DPR, bloom, lighting, shadows, postprocessing, geometry detail, particles, labels, shaders, animations, camera motion, or visual styling.
+- Pass 3 only changes build scripts and build configuration.
+
+Verification command results:
+
+- `npm run build:single`
+  - Passed.
+  - `vite-plugin-singlefile` remained active.
+  - Output: `dist/index.html 1,590.77 kB | gzip: 472.70 kB`.
+- `npm run build:split`
+  - Passed.
+  - Emitted separate JS/CSS assets and lazy overlay chunks.
+  - Initial `dist/index.html`: `978 B | gzip: 510 B`.
+  - Initial route assets referenced by `index.html`: `index-cs5qjy-W.js`, `react-vendor-Cs9zSfOU.js`, `three-vendor-B59sHfnY.js`, and `index-BPXlrPUF.css`.
+- `git diff --check`
+  - Passed with no whitespace errors.
+- Split production preview
+  - Running at `http://localhost:4175/`.
+  - Returned HTTP 200.
+
+Split build emitted chunks:
+
+| File | Raw | Gzip |
+| --- | ---: | ---: |
+| `dist/index.html` | `978 B` | `510 B` |
+| `dist/assets/index-BPXlrPUF.css` | `69,827 B` | `11,416 B` |
+| `dist/assets/index-cs5qjy-W.js` | `116,860 B` | `37,778 B` |
+| `dist/assets/react-vendor-Cs9zSfOU.js` | `192,532 B` | `60,171 B` |
+| `dist/assets/three-vendor-B59sHfnY.js` | `1,157,240 B` | `346,343 B` |
+| `dist/assets/PlaygroundOverlay-CkyVUY_c.js` | `22,760 B` | `7,090 B` |
+| `dist/assets/ArticleReader-CUGMtKRT.js` | `10,265 B` | `3,385 B` |
+| `dist/assets/ComponentPortal-DP_MyipG.js` | `8,880 B` | `2,497 B` |
+| `dist/assets/TrackPage-C9QenvZp.js` | `5,007 B` | `1,932 B` |
+| `dist/assets/SearchPalette-CvdjJOpz.js` | `3,293 B` | `1,313 B` |
+
+Build/output notes:
+
+- Lazy overlay chunks are now separate in split output.
+- `PlaygroundOverlay` is separated from the initial route payload as `PlaygroundOverlay-CkyVUY_c.js`.
+- `dist/index.html` does not preload the overlay chunks.
+- Initial split assets still include `three-vendor` because the landing hero itself uses R3F/Three.
+- Under split output, Pass 2 becomes a real loading optimization for closed overlays.
+
+Manual visual verification still needed:
+
+- Hero loads and looks unchanged.
+- Die/model quality unchanged.
+- Initial landing visual unchanged.
+- Playground opens correctly after lazy chunk load.
+- No ugly blank flash appears.
+- Search opens correctly.
+- Article reader opens correctly.
+- Track page and component portal open correctly.
+- Desktop and mobile viewport sanity checks pass.

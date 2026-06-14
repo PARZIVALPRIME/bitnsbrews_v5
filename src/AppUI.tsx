@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, useRef, useCallback, startTransition } from "react";
+import { lazy, Suspense, useState, useEffect, useRef, useCallback, startTransition } from "react";
 import { Canvas } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import { QualityContext } from "./soc/quality";
@@ -6,16 +6,16 @@ import { CHAPTERS, TOTAL } from "./chapters";
 import { getArticleForLevel, parseMarkdown } from "./chapterArticles";
 import { TRACKS, getTrackArticle } from "./trackArticles";
 import { getArticle } from "./articles";
-import { ArticleReader } from "./ArticleReader";
-import { ComponentPortal } from "./ComponentPortal";
-import { TrackPage } from "./TrackPage";
 import { Footer } from "./components/Footer";
-import { SearchPalette } from "./components/SearchPalette";
 import { BLOCKS } from "./soc/data";
 import { ARTICLE_BLOCK_IDS } from "./articles";
 import { TrackIcon } from "./components/TrackIcon";
 
-import { PlaygroundOverlay } from "./soc/PlaygroundOverlay";
+const LazyArticleReader = lazy(() => import("./ArticleReader").then((module) => ({ default: module.ArticleReader })));
+const LazyComponentPortal = lazy(() => import("./ComponentPortal").then((module) => ({ default: module.ComponentPortal })));
+const LazyTrackPage = lazy(() => import("./TrackPage").then((module) => ({ default: module.TrackPage })));
+const LazySearchPalette = lazy(() => import("./components/SearchPalette").then((module) => ({ default: module.SearchPalette })));
+const LazyPlaygroundOverlay = lazy(() => import("./soc/PlaygroundOverlay").then((module) => ({ default: module.PlaygroundOverlay })));
 
 interface SceneProps {
   t: number;
@@ -34,6 +34,38 @@ interface UiProps {
 
 // Shared label style: quiet uppercase eyebrow — used sparingly, one per section.
 const EYEBROW = "text-[10px] font-medium tracking-[0.12em] uppercase";
+
+function OverlayLoadingFallback({ variant = "fullscreen" }: { variant?: "fullscreen" | "search" }) {
+  if (variant === "search") {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 backdrop-blur-md bg-black/40">
+        <div className="panel w-full max-w-2xl rounded-2xl border border-white/10 bg-[rgba(15,18,26,0.94)] shadow-2xl overflow-hidden">
+          <div className="flex items-center gap-4 px-6 py-4 border-b border-white/10">
+            <div className="h-5 w-5 rounded-full border border-[#8aa9ff]/50" />
+            <div className="h-4 flex-1 rounded-full bg-white/[0.06] overflow-hidden">
+              <div className="boot-bar h-full w-1/2 rounded-full bg-white/35" />
+            </div>
+          </div>
+          <div className="p-5 space-y-3">
+            <div className="h-3 w-1/2 rounded-full bg-white/[0.06]" />
+            <div className="h-3 w-2/3 rounded-full bg-white/[0.04]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0b0d12] text-white">
+      <div className="text-[16px] font-semibold tracking-[-0.01em] text-white/90 mb-8">
+        Bits&apos;nBrews
+      </div>
+      <div className="w-[160px] h-[2px] bg-white/10 relative overflow-hidden rounded-full">
+        <div className="boot-bar absolute inset-0 bg-white/70 rounded-full" />
+      </div>
+    </div>
+  );
+}
 
 export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop" }: UiProps) {
   // ── State ─────────────────────────────────────────────────────────────────
@@ -914,49 +946,63 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       </div>
 
       {showPlayground && (
-        <PlaygroundOverlay
-          quality={perfMode === "high" ? "desktop" : "mobile"}
-          onClose={() => setShowPlayground(false)}
-        />
+        <Suspense fallback={<OverlayLoadingFallback />}>
+          <LazyPlaygroundOverlay
+            quality={perfMode === "high" ? "desktop" : "mobile"}
+            onClose={() => setShowPlayground(false)}
+          />
+        </Suspense>
       )}
 
       {activeTrackPageId && (
-        <TrackPage
-          trackId={activeTrackPageId}
-          onClose={() => setActiveTrackPageId(null)}
-          onReadArticle={(articleId) => {
-            setReaderArticleId(articleId);
-          }}
-        />
+        <Suspense fallback={<OverlayLoadingFallback />}>
+          <LazyTrackPage
+            trackId={activeTrackPageId}
+            onClose={() => setActiveTrackPageId(null)}
+            onReadArticle={(articleId) => {
+              setReaderArticleId(articleId);
+            }}
+          />
+        </Suspense>
       )}
 
       {activeComponentPortal && (
-        <ComponentPortal
-          componentId={activeComponentPortal}
-          onClose={() => {
-            setActiveComponentPortal(null);
-            setSelectedBlock(null);
-          }}
-          onReadArticle={(articleId) => {
-            setReaderArticleId(articleId);
-          }}
-        />
+        <Suspense fallback={<OverlayLoadingFallback />}>
+          <LazyComponentPortal
+            componentId={activeComponentPortal}
+            onClose={() => {
+              setActiveComponentPortal(null);
+              setSelectedBlock(null);
+            }}
+            onReadArticle={(articleId) => {
+              setReaderArticleId(articleId);
+            }}
+          />
+        </Suspense>
       )}
 
       {(() => {
         if (!readerArticleId) return null;
         const article = getArticle(readerArticleId);
         if (!article) return null;
-        return <ArticleReader article={article} onClose={() => setReaderArticleId(null)} onNavigate={(id) => setReaderArticleId(id)} />;
+        return (
+          <Suspense fallback={<OverlayLoadingFallback />}>
+            <LazyArticleReader article={article} onClose={() => setReaderArticleId(null)} onNavigate={(id) => setReaderArticleId(id)} />
+          </Suspense>
+        );
       })()}
 
       {/* ── Global Search Palette ──────────────────────────────────────────── */}
-      <SearchPalette
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onSelectArticle={(id) => setReaderArticleId(id)}
-        onSelectTrack={(id) => setActiveTrackPageId(id)}
-      />
+      {isSearchOpen && (
+        <Suspense fallback={<OverlayLoadingFallback variant="search" />}>
+          <LazySearchPalette
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            onSelectArticle={(id) => setReaderArticleId(id)}
+            onSelectTrack={(id) => setActiveTrackPageId(id)}
+          />
+        </Suspense>
+      )}
 
       {/* ── Boot screen — branded cover while shaders compile ─────────────── */}
       <div
