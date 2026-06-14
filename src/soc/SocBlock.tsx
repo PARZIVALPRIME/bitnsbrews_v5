@@ -56,6 +56,10 @@ export function SocBlock({
   const outlineMat = useRef<THREE.LineBasicMaterial>(null!);
   const thermalMat = useRef<THREE.ShaderMaterial>(null!);
 
+  const labelLineRef = useRef<any>(null!);
+  const labelSphereMatRef = useRef<THREE.MeshBasicMaterial>(null!);
+  const labelDivRef = useRef<HTMLDivElement>(null!);
+
   const cur = useRef(0);
   const liftVel = useRef(0);
   const utilCur = useRef(0);
@@ -73,6 +77,7 @@ export function SocBlock({
   const liftMax = block.lift;
   const dist = useMemo(() => Math.sqrt(cx * cx + cz * cz), [cx, cz]);
   const isArticleBlock = useMemo(() => ARTICLE_BLOCK_IDS.has(block.id), [block.id]);
+  const track = useMemo(() => getTrackForBlock(block.id), [block.id]);
 
   const thermalUniforms = useMemo(
     () => ({
@@ -90,6 +95,46 @@ export function SocBlock({
     const currentLevel = Math.round(levelFloat);
     if (currentLevel !== level) {
       setLevel(currentLevel);
+    }
+
+    // Calculate smooth label opacity based on levelFloat
+    let labelOpacity = 0;
+    if (showPlayground) {
+      labelOpacity = (playgroundShowLabels && block.showLabel) || selected ? 1.0 : 0.0;
+    } else {
+      // Transition from 2 to 3. We want labels to fade in from 2.4 and fade out by 3.6
+      if (levelFloat >= 2.4 && levelFloat <= 3.6) {
+        if (levelFloat >= 2.4 && levelFloat < 2.8) {
+          labelOpacity = (levelFloat - 2.4) / 0.4;
+        } else if (levelFloat >= 2.8 && levelFloat <= 3.2) {
+          labelOpacity = 1.0;
+        } else {
+          labelOpacity = (3.6 - levelFloat) / 0.4;
+        }
+      }
+      
+      const shouldBeVisible = isMobile
+        ? selected
+        : ((block.showLabel && !!track && !dimmed) || selected);
+      
+      if (!shouldBeVisible) {
+        labelOpacity = 0.0;
+      }
+    }
+
+    // Direct opacity and visibility mutations on Three.js & DOM refs for locked 60fps scrolling
+    if (labelLineRef.current && labelLineRef.current.material) {
+      labelLineRef.current.material.opacity = (selected ? 0.9 : 0.45) * labelOpacity;
+      labelLineRef.current.material.transparent = true;
+      labelLineRef.current.visible = labelOpacity > 0.01;
+    }
+    if (labelSphereMatRef.current) {
+      labelSphereMatRef.current.opacity = 0.95 * labelOpacity;
+      labelSphereMatRef.current.visible = labelOpacity > 0.01;
+    }
+    if (labelDivRef.current) {
+      labelDivRef.current.style.opacity = `${labelOpacity}`;
+      labelDivRef.current.style.pointerEvents = labelOpacity > 0.15 ? "auto" : "none";
     }
 
     if (isMobile) {
@@ -245,13 +290,11 @@ export function SocBlock({
     dir[2] * labelScale,
   ];
 
-  const track = useMemo(() => getTrackForBlock(block.id), [block.id]);
-  const showLabels = level === 2;
   const labelVisible = showPlayground
     ? (playgroundShowLabels && block.showLabel) || selected
     : (level >= 2 && level <= 3) && (isMobile
       ? selected
-      : (((level === 3 || showLabels) && block.showLabel && !!track && !dimmed) || selected));
+      : ((block.showLabel && !!track && !dimmed) || selected));
 
   return (
     <group position={[cx, 0, cz]}>
@@ -342,6 +385,7 @@ export function SocBlock({
         {visMode !== "thermal" && labelVisible && (
           <>
             <Line
+              ref={labelLineRef}
               points={[anchor, labelPt]}
               color={accent}
               lineWidth={1}
@@ -350,7 +394,7 @@ export function SocBlock({
             />
             <mesh position={anchor}>
               <sphereGeometry args={[0.06, isMobile ? 6 : 10, isMobile ? 6 : 10]} />
-              <meshBasicMaterial color={accent} transparent opacity={0.95} />
+              <meshBasicMaterial ref={labelSphereMatRef} color={accent} transparent opacity={0.95} />
             </mesh>
             <Html
               position={labelPt}
@@ -383,6 +427,7 @@ export function SocBlock({
                 className="pointer-events-auto select-none whitespace-nowrap cursor-pointer text-left block bg-transparent border-0 p-0"
               >
                 <div
+                  ref={labelDivRef}
                   className="rounded-xl px-4 py-3 transition-all duration-300 ease-out"
                   style={{
                     background: selected 

@@ -43,7 +43,6 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   const [targetLevel, setTargetLevel] = useState(1.0);       // snap destination (1-4)
   const [activeChapterLevel, setActiveChapterLevel] = useState(1);
   const [displayedChapter, setDisplayedChapter] = useState(CHAPTERS[0]);
-  const [chapterVisible, setChapterVisible] = useState(true); // text fade state
   const [t, setT] = useState(0.0);
   const [visMode] = useState("physical");
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
@@ -83,20 +82,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     return () => clearTimeout(id);
   }, []);
 
-  // ── Chapter description cross-fade when crossing integer boundaries ─────
-  useEffect(() => {
-    const nextLvl = Math.max(1, Math.min(TOTAL, Math.round(targetLevel)));
-    if (nextLvl !== activeChapterLevel) {
-      setChapterVisible(false);
-      const timer = setTimeout(() => {
-        setActiveChapterLevel(nextLvl);
-        const chap = CHAPTERS.find((c) => c.level === nextLvl) ?? CHAPTERS[0];
-        setDisplayedChapter(chap);
-        setChapterVisible(true);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [targetLevel, activeChapterLevel]);
+  const activeChapterRef = useRef(1);
 
   // ── HTML Panel Refs for Real-Time Canvas Synchronization ───────────────────
   const heroPanelRef = useRef<HTMLDivElement>(null);
@@ -132,6 +118,15 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       return c * c * (3 - 2 * c);
     };
 
+    // Update active chapter text when crossing boundaries
+    const roundedLevel = Math.max(1, Math.min(TOTAL, Math.round(levelFloat)));
+    if (roundedLevel !== activeChapterRef.current) {
+      activeChapterRef.current = roundedLevel;
+      setActiveChapterLevel(roundedLevel);
+      const chap = CHAPTERS.find((c) => c.level === roundedLevel) ?? CHAPTERS[0];
+      setDisplayedChapter(chap);
+    }
+
     // 1. Chapter 1 Hero Panel — recedes into depth as the camera dives to the die
     if (heroPanelRef.current) {
       const opacity = smooth(1 - Math.abs(levelFloat - 1) * 1.7);
@@ -142,13 +137,23 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       heroPanelRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
     }
 
-    // 2. Chapters 2–4 Panel — rises into place, picking up where the hero left off
+    // 2. Chapters 2–3 Panel — rises into place, fades out at midpoints to swap text cleanly
     if (chapterPanelRef.current) {
       let opacity = 0;
-      if (!playgroundActive && levelFloat >= 1.5 && levelFloat <= 4.3) {
-        const fromCh1 = (levelFloat - 1.5) * 3.0;
-        const toEnd = (4.3 - levelFloat) * 3.2;
-        opacity = smooth(Math.min(fromCh1, toEnd));
+      if (!playgroundActive && levelFloat >= 1.4 && levelFloat <= 3.6) {
+        // Find how close we are to the active range [2, 3]
+        const dist = Math.min(
+          Math.max(0, (levelFloat - 1.4) / 0.4), // Fade in as we leave Chapter 1
+          Math.max(0, (3.6 - levelFloat) / 0.4)  // Fade out as we enter Chapter 4
+        );
+        
+        // Also fade out in the middle of transitions to swap text cleanly
+        // Midpoint between Chapter 2 and 3 is 2.5
+        const distToMidpoint = Math.abs(levelFloat - 2.5);
+        // We fade out within 0.25 of the midpoint (between 2.25 and 2.75)
+        const midpointFade = Math.max(0, Math.min(1, (distToMidpoint - 0.1) / 0.2));
+        
+        opacity = smooth(Math.min(dist, midpointFade));
       }
       // settle from a touch below as it fades in, plus a per-chapter rise
       const rise = (Math.round(levelFloat) - levelFloat) * 26;
@@ -580,8 +585,6 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           <button
             onClick={() => {
               setTargetLevel(2);
-              setChapterVisible(false);
-              setTimeout(() => setChapterVisible(true), 320);
             }}
             className="group flex items-center gap-2.5 text-[13px] font-medium text-[#0b0d12] bg-white/95 hover:bg-white transition-all duration-200 px-6 py-3 rounded-lg cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
           >
@@ -613,13 +616,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: "none",
         }}
       >
-        <div
-          style={{
-            opacity: chapterVisible ? 1 : 0,
-            transform: chapterVisible ? "translate3d(0, 0, 0)" : "translate3d(0, 6px, 0)",
-            transition: "opacity 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms cubic-bezier(0.16, 1, 0.3, 1)",
-          }}
-        >
+        <div>
           <div className={`${EYEBROW} text-[#8aa9ff] mb-2.5`}>
             Chapter {currentChapter.chapter}
           </div>
@@ -729,8 +726,6 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             key={c.level}
             onClick={() => {
               setTargetLevel(c.level);
-              setChapterVisible(false);
-              setTimeout(() => setChapterVisible(true), 320);
             }}
             title={c.title}
             className="group relative flex items-center justify-end gap-2"
@@ -811,10 +806,10 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         style={{
           top: "96px",
           bottom: "24px",
-          opacity: targetLevel === 4 && chapterVisible ? 1 : 0,
-          transform: targetLevel === 4 && chapterVisible ? "translateY(0)" : "translateY(16px)",
+          opacity: targetLevel === 4 ? 1 : 0,
+          transform: targetLevel === 4 ? "translateY(0)" : "translateY(16px)",
           pointerEvents: targetLevel === 4 ? "auto" : "none",
-          transition: "opacity 600ms ease, transform 600ms ease",
+          transition: "opacity 600ms cubic-bezier(0.16, 1, 0.3, 1), transform 600ms cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         onScroll={(e) => {
           const target = e.currentTarget;

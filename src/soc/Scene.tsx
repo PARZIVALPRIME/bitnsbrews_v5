@@ -500,6 +500,23 @@ function CameraController({
   const mouse = useRef(new THREE.Vector2(0, 0));
   const parallax = useRef({ x: 0, y: 0 });
 
+  const initialized = useRef(false);
+  const posSpring = useRef({
+    current: new THREE.Vector3(),
+    target: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    stiffness: 42,
+    damping: 14,
+  });
+
+  const targetSpring = useRef({
+    current: new THREE.Vector3(),
+    target: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    stiffness: 42,
+    damping: 14,
+  });
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -509,14 +526,42 @@ function CameraController({
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (showPlayground) return; // Yield complete camera control to OrbitControls!
 
     const levelFloat = globalLevelState.current;
     const time = state.clock.getElapsedTime();
+    const dt = Math.min(0.03, delta);
 
     // Get camera params dynamically
     const targetParams = getCameraParamsInterpolated(levelFloat, selectedBlockCoords);
+
+    if (!initialized.current) {
+      posSpring.current.current.copy(camera.position);
+      posSpring.current.target.copy(targetParams.position);
+      targetSpring.current.current.copy(targetParams.target);
+      targetSpring.current.target.copy(targetParams.target);
+      targetRef.current.copy(targetParams.target);
+      initialized.current = true;
+    }
+
+    // Update spring targets
+    posSpring.current.target.copy(targetParams.position);
+    targetSpring.current.target.copy(targetParams.target);
+
+    // Solve position spring
+    const pSpring = posSpring.current;
+    const pDiff = new THREE.Vector3().subVectors(pSpring.current, pSpring.target);
+    const pAccel = pDiff.clone().multiplyScalar(-pSpring.stiffness).sub(pSpring.velocity.clone().multiplyScalar(pSpring.damping));
+    pSpring.velocity.add(pAccel.multiplyScalar(dt));
+    pSpring.current.add(pSpring.velocity.clone().multiplyScalar(dt));
+
+    // Solve target spring
+    const tSpring = targetSpring.current;
+    const tDiff = new THREE.Vector3().subVectors(tSpring.current, tSpring.target);
+    const tAccel = tDiff.clone().multiplyScalar(-tSpring.stiffness).sub(tSpring.velocity.clone().multiplyScalar(tSpring.damping));
+    tSpring.velocity.add(tAccel.multiplyScalar(dt));
+    tSpring.current.add(tSpring.velocity.clone().multiplyScalar(dt));
 
     // Subtle micro-breathing drift
     const driftX = Math.sin(time * 0.35) * 0.08;
@@ -532,23 +577,22 @@ function CameraController({
     parallax.current.x += (targetPX - parallax.current.x) * 0.04;
     parallax.current.y += (targetPY - parallax.current.y) * 0.04;
 
-    const finalPos = targetParams.position.clone().add(
+    const finalPos = pSpring.current.clone().add(
       new THREE.Vector3(driftX + parallax.current.x, driftY + parallax.current.y, driftZ)
     );
 
     // Apply flight-sim style roll banking around forward direction
-    const forward = new THREE.Vector3().subVectors(targetParams.target, targetParams.position).normalize();
+    const forward = new THREE.Vector3().subVectors(tSpring.current, pSpring.current).normalize();
     const upVector = new THREE.Vector3(0, 1, 0).applyAxisAngle(forward, targetParams.roll || 0);
     camera.up.copy(upVector);
 
-    // Ultra-slow cinematic easing for a luxurious, sweeping glide
-    camera.position.lerp(finalPos, 0.04);
-    targetRef.current.lerp(targetParams.target, 0.04);
+    camera.position.copy(finalPos);
+    targetRef.current.copy(tSpring.current);
     camera.lookAt(targetRef.current);
 
     const persCam = camera as THREE.PerspectiveCamera;
     if (persCam.isPerspectiveCamera) {
-      persCam.fov += (targetParams.fov - persCam.fov) * 0.035;
+      persCam.fov += (targetParams.fov - persCam.fov) * 0.045;
       persCam.updateProjectionMatrix();
     }
   });
