@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, useRef, useCallback } from "react";
+import React, { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import { QualityContext } from "./soc/quality";
@@ -6,23 +6,24 @@ import { CHAPTERS, TOTAL } from "./chapters";
 import { getArticleForLevel, parseMarkdown } from "./chapterArticles";
 import { TRACKS } from "./trackArticles";
 import { getArticle } from "./articles";
-import { ArticleReader } from "./ArticleReader";
-import { ComponentPortal } from "./ComponentPortal";
-import { TrackPage } from "./TrackPage";
 import { Footer } from "./components/Footer";
 import { SearchPalette } from "./components/SearchPalette";
 import { BLOCKS, SocMode } from "./soc/data";
 import { ARTICLE_BLOCK_IDS } from "./articles";
 import { TrackIcon } from "./components/TrackIcon";
 
-import { PlaygroundOverlay } from "./soc/PlaygroundOverlay";
+// Lazy-load heavy overlays to speed up initial bundle delivery and interactions
+const PlaygroundOverlay = React.lazy(() => import("./soc/PlaygroundOverlay").then(m => ({ default: m.PlaygroundOverlay })));
+const TrackPage = React.lazy(() => import("./TrackPage").then(m => ({ default: m.TrackPage })));
+const ComponentPortal = React.lazy(() => import("./ComponentPortal").then(m => ({ default: m.ComponentPortal })));
+const ArticleReader = React.lazy(() => import("./ArticleReader").then(m => ({ default: m.ArticleReader })));
 
 interface SceneProps {
   t: number;
   selected: string | null;
   setSelected: (id: string | null) => void;
   mode: SocMode;
-  targetLevel: number;
+  targetLevelRef: React.RefObject<number>;
   visMode: string;
   uiTransitionRef?: React.RefObject<{ onUpdate: (levelFloat: number) => void } | null>;
   showPlayground?: boolean;
@@ -40,13 +41,12 @@ const EYEBROW = "text-[10px] font-medium tracking-[0.12em] uppercase";
 
 export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop" }: UiProps) {
   // ── State ─────────────────────────────────────────────────────────────────
-  const [targetLevel, setTargetLevel] = useState(1.0);       // snap destination (1-4)
+  const targetLevelRef = useRef(1.0);
   const [activeChapterLevel, setActiveChapterLevel] = useState(1);
   const [displayedChapter, setDisplayedChapter] = useState(CHAPTERS[0]);
   const [t, setT] = useState(0.0);
   const [visMode] = useState("physical");
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
-  const [hubAtBottom, setHubAtBottom] = useState(false);
   const [activeTrackPageId, setActiveTrackPageId] = useState<string | null>(null);
 
   // ── Article gallery (Page 4) state ────────────────────────────────────────
@@ -90,6 +90,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   const tracksMenuRef = useRef<HTMLDivElement>(null);
   const detailPanelRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const progressIndicatorRef = useRef<HTMLDivElement>(null);
+  const chapterCounterRef = useRef<HTMLDivElement>(null);
+  const hubBackdropRef = useRef<HTMLDivElement>(null);
+  const hubCatalogRef = useRef<HTMLDivElement>(null);
+  const hubAtBottomRef = useRef(false);
   const vignetteLeftRef = useRef<HTMLDivElement>(null);
   const vignetteRadialRef = useRef<HTMLDivElement>(null);
 
@@ -125,6 +130,12 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       setActiveChapterLevel(roundedLevel);
       const chap = CHAPTERS.find((c) => c.level === roundedLevel) ?? CHAPTERS[0];
       setDisplayedChapter(chap);
+
+      // Reset block selection and scroll status when leaving chapter 3
+      if (roundedLevel !== 3) {
+        setSelectedBlock(null);
+      }
+      hubAtBottomRef.current = false;
     }
 
     // 1. Chapter 1 Hero Panel — recedes into depth as the camera dives to the die
@@ -204,6 +215,29 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       progressBarRef.current.style.opacity = `${opacity}`;
       progressBarRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
     }
+
+    // 6. Hub Backdrop & Catalogue Container
+    const hubOpacity = Math.max(0, Math.min(1, (levelFloat - 3.4) / 0.55));
+    if (hubBackdropRef.current) {
+      hubBackdropRef.current.style.opacity = `${hubOpacity * (hubAtBottomRef.current ? 0.22 : 0.82)}`;
+      hubBackdropRef.current.style.pointerEvents = hubOpacity > 0.15 ? "auto" : "none";
+    }
+    if (hubCatalogRef.current) {
+      hubCatalogRef.current.style.opacity = `${hubOpacity}`;
+      const ty = (1 - hubOpacity) * 16 + my;
+      hubCatalogRef.current.style.transform = `translate3d(${mx}px, ${ty}px, 0)`;
+      hubCatalogRef.current.style.pointerEvents = hubOpacity > 0.15 ? "auto" : "none";
+    }
+
+    // 7. Progress Bar Inner Indicator Width & Chapter Counter
+    if (progressIndicatorRef.current) {
+      const pct = Math.max(0, Math.min(100, ((levelFloat - 1) / (TOTAL - 1)) * 100));
+      progressIndicatorRef.current.style.width = `${pct}%`;
+    }
+    if (chapterCounterRef.current) {
+      const displayVal = Math.round(levelFloat);
+      chapterCounterRef.current.innerText = `${String(displayVal).padStart(2, "0")} / ${String(TOTAL).padStart(2, "0")}`;
+    }
   }, []);
 
   useEffect(() => {
@@ -274,33 +308,26 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     return () => cancelAnimationFrame(rAF);
   }, []);
 
+  // Synchronized level transitions and block selection state reset
   useEffect(() => {
-    if (Math.round(targetLevel) !== 3) {
+    if (activeChapterLevel !== 3) {
       setSelectedBlock(null);
     }
-    setHubAtBottom(false);
-  }, [targetLevel]);
-
-  // Track targetLevel in a ref to keep global listeners current without rebinding
-  const targetLevelRef = useRef(targetLevel);
-  useEffect(() => {
-    targetLevelRef.current = targetLevel;
-  }, [targetLevel]);
+    hubAtBottomRef.current = false;
+  }, [activeChapterLevel]);
 
   // ── Snap-to-chapter scroll: wheel + keyboard ──────────────────────────────
   useEffect(() => {
     let snapTimer: any = null;
 
     const advance = (dir: 1 | -1) => {
-      setTargetLevel((prev) => {
-        let next;
-        if (dir === 1) {
-          next = Math.min(TOTAL, Math.floor(prev + 1.0));
-        } else {
-          next = Math.max(1.0, Math.ceil(prev - 1.0));
-        }
-        return next;
-      });
+      let next;
+      if (dir === 1) {
+        next = Math.min(TOTAL, Math.floor(targetLevelRef.current + 1.0));
+      } else {
+        next = Math.max(1.0, Math.ceil(targetLevelRef.current - 1.0));
+      }
+      targetLevelRef.current = next;
     };
 
     const handleWheel = (e: WheelEvent) => {
@@ -339,22 +366,16 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       // Continuous floating-point scroll mapping
       const speed = 0.0016; // scrub speed
-      setTargetLevel((prev) => {
-        const next = Math.max(1.0, Math.min(TOTAL, prev + e.deltaY * speed));
-        
-        if (snapTimer) clearTimeout(snapTimer);
-        snapTimer = setTimeout(() => {
-          setTargetLevel((curr) => {
-            const nearest = Math.round(curr);
-            if (Math.abs(curr - nearest) > 0.01) {
-              return nearest;
-            }
-            return curr;
-          });
-        }, 400);
-
-        return next;
-      });
+      const nextVal = Math.max(1.0, Math.min(TOTAL, targetLevelRef.current + e.deltaY * speed));
+      targetLevelRef.current = nextVal;
+      
+      if (snapTimer) clearTimeout(snapTimer);
+      snapTimer = setTimeout(() => {
+        const nearest = Math.round(targetLevelRef.current);
+        if (Math.abs(targetLevelRef.current - nearest) > 0.01) {
+          targetLevelRef.current = nearest;
+        }
+      }, 400);
     };
 
     const handleKey = (e: KeyboardEvent) => {
@@ -467,7 +488,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                   selected={selectedBlock}
                   setSelected={handleBlockSelect}
                   mode={showPlayground ? playgroundMode : "Idle"}
-                  targetLevel={targetLevel}
+                  targetLevelRef={targetLevelRef}
                   visMode={visMode}
                   uiTransitionRef={uiTransitionRef}
                   showPlayground={showPlayground}
@@ -584,7 +605,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         <div className="flex items-center gap-5">
           <button
             onClick={() => {
-              setTargetLevel(2);
+              targetLevelRef.current = 2;
             }}
             className="group flex items-center gap-2.5 text-[13px] font-medium text-[#0b0d12] bg-white/95 hover:bg-white transition-all duration-200 px-6 py-3 rounded-lg cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
           >
@@ -593,7 +614,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           </button>
           <button
             onClick={() => {
-              setTargetLevel(4);
+              targetLevelRef.current = 4;
               setTimeout(() => {
                 const el = document.getElementById("hub-catalog-container");
                 if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
@@ -725,7 +746,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           <button
             key={c.level}
             onClick={() => {
-              setTargetLevel(c.level);
+              targetLevelRef.current = c.level;
             }}
             title={c.title}
             className="group relative flex items-center justify-end gap-2"
@@ -793,29 +814,36 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
       {/* ── Hub: Full-screen Dark Backdrop Overlay ───────────────────────── */}
       <div
+        ref={hubBackdropRef}
         className="pointer-events-none absolute inset-0 z-15 bg-black transition-opacity duration-1000 ease-in-out"
         style={{
-          opacity: targetLevel === 4 ? (hubAtBottom ? 0.22 : 0.82) : 0,
+          opacity: 0,
         }}
       />
 
       {/* ── Level 11: Hub Directory & Team Dashboard (Single Column Redesign) ── */}
       <div
+        ref={hubCatalogRef}
         id="hub-catalog-container"
         className="absolute inset-x-0 z-25 text-left overflow-y-auto scrollbar-thin"
         style={{
           top: "96px",
           bottom: "24px",
-          opacity: targetLevel === 4 ? 1 : 0,
-          transform: targetLevel === 4 ? "translateY(0)" : "translateY(16px)",
-          pointerEvents: targetLevel === 4 ? "auto" : "none",
+          opacity: 0,
+          transform: "translate3d(0, 16px, 0)",
+          pointerEvents: "none",
           transition: "opacity 600ms cubic-bezier(0.16, 1, 0.3, 1), transform 600ms cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         onScroll={(e) => {
           const target = e.currentTarget;
           const threshold = 160;
           const nearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < threshold;
-          setHubAtBottom(nearBottom);
+          if (nearBottom !== hubAtBottomRef.current) {
+            hubAtBottomRef.current = nearBottom;
+            if (hubBackdropRef.current) {
+              hubBackdropRef.current.style.opacity = nearBottom ? "0.22" : "0.82";
+            }
+          }
         }}
       >
         <div className="max-w-[760px] mx-auto flex flex-col gap-8 px-6 sm:px-8">
@@ -881,8 +909,8 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                 <div
                   key={track.id}
                   style={{
-                    opacity: targetLevel === 4 ? 1 : 0,
-                    transform: targetLevel === 4 ? "translateY(0)" : "translateY(16px)",
+                    opacity: activeChapterLevel === 4 ? 1 : 0,
+                    transform: activeChapterLevel === 4 ? "translateY(0)" : "translateY(16px)",
                     transition: `opacity 600ms ease ${idx * 80}ms, transform 600ms ease ${idx * 80}ms`
                   }}
                 >
@@ -925,7 +953,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         {/* ── Subscribe Newsletter: Full Sweep Footer ── */}
         <Footer 
           onNavigateToDie={() => {
-            setTargetLevel(3);
+            targetLevelRef.current = 3;
             setShowPlayground(true);
           }}
           onNavigateToTracks={() => {
@@ -949,15 +977,19 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         {/* Progress bar */}
         <div className="flex-1 h-px bg-white/[0.08] relative overflow-hidden rounded-full">
           <div
-            className="absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-in-out bg-[#8aa9ff]/70"
+            ref={progressIndicatorRef}
+            className="absolute left-0 top-0 h-full rounded-full bg-[#8aa9ff]/70"
             style={{
-              width: `${((targetLevel - 1) / (TOTAL - 1)) * 100}%`,
+              width: `${((targetLevelRef.current - 1) / (TOTAL - 1)) * 100}%`,
             }}
           />
         </div>
         {/* Chapter counter */}
-        <div className="text-[11px] font-mono text-white/35 shrink-0">
-          {String(targetLevel).padStart(2, "0")} / {String(TOTAL).padStart(2, "0")}
+        <div 
+          ref={chapterCounterRef}
+          className="text-[11px] font-mono text-white/35 shrink-0"
+        >
+          {String(Math.round(targetLevelRef.current)).padStart(2, "0")} / {String(TOTAL).padStart(2, "0")}
         </div>
         {/* Scroll hint — fades after first interaction */}
         <div className="text-[11px] text-white/30 shrink-0">
@@ -966,51 +998,61 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       </div>
 
       {showPlayground && (
-        <PlaygroundOverlay
-          mode={playgroundMode}
-          setMode={setPlaygroundMode}
-          t={playgroundT}
-          setT={setPlaygroundT}
-          showLabels={playgroundShowLabels}
-          setShowLabels={setPlaygroundShowLabels}
-          selected={selectedBlock}
-          setSelected={setSelectedBlock}
-          onZoom={(factor) => sceneInteractionRef.current?.zoom(factor)}
-          onResetView={() => sceneInteractionRef.current?.resetView()}
-          quality={perfMode === "high" ? "desktop" : "mobile"}
-          onClose={() => setShowPlayground(false)}
-        />
+        <Suspense fallback={null}>
+          <PlaygroundOverlay
+            mode={playgroundMode}
+            setMode={setPlaygroundMode}
+            t={playgroundT}
+            setT={setPlaygroundT}
+            showLabels={playgroundShowLabels}
+            setShowLabels={setPlaygroundShowLabels}
+            selected={selectedBlock}
+            setSelected={setSelectedBlock}
+            onZoom={(factor) => sceneInteractionRef.current?.zoom(factor)}
+            onResetView={() => sceneInteractionRef.current?.resetView()}
+            quality={perfMode === "high" ? "desktop" : "mobile"}
+            onClose={() => setShowPlayground(false)}
+          />
+        </Suspense>
       )}
 
       {activeTrackPageId && (
-        <TrackPage
-          trackId={activeTrackPageId}
-          onClose={() => setActiveTrackPageId(null)}
-          onReadArticle={(articleId) => {
-            setReaderArticleId(articleId);
-          }}
-        />
+        <Suspense fallback={null}>
+          <TrackPage
+            trackId={activeTrackPageId}
+            onClose={() => setActiveTrackPageId(null)}
+            onReadArticle={(articleId) => {
+              setReaderArticleId(articleId);
+            }}
+          />
+        </Suspense>
       )}
 
       {activeComponentPortal && (
-        <ComponentPortal
-          componentId={activeComponentPortal}
-          isReaderOpen={!!readerArticleId}
-          onClose={() => {
-            setActiveComponentPortal(null);
-            setSelectedBlock(null);
-          }}
-          onReadArticle={(articleId) => {
-            setReaderArticleId(articleId);
-          }}
-        />
+        <Suspense fallback={null}>
+          <ComponentPortal
+            componentId={activeComponentPortal}
+            isReaderOpen={!!readerArticleId}
+            onClose={() => {
+              setActiveComponentPortal(null);
+              setSelectedBlock(null);
+            }}
+            onReadArticle={(articleId) => {
+              setReaderArticleId(articleId);
+            }}
+          />
+        </Suspense>
       )}
 
       {(() => {
         if (!readerArticleId) return null;
         const article = getArticle(readerArticleId);
         if (!article) return null;
-        return <ArticleReader article={article} onClose={() => setReaderArticleId(null)} onNavigate={(id) => setReaderArticleId(id)} />;
+        return (
+          <Suspense fallback={null}>
+            <ArticleReader article={article} onClose={() => setReaderArticleId(null)} onNavigate={(id) => setReaderArticleId(id)} />
+          </Suspense>
+        );
       })()}
 
       {/* ── Global Search Palette ──────────────────────────────────────────── */}

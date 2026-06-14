@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { accentFor, BLOCKS, TRAFFIC_PATHS, SocMode } from "./data";
@@ -68,7 +68,14 @@ function FlowTube({
     // Far fewer tube/ring segments on mobile.
     const geo = new THREE.TubeGeometry(c, isMobile ? 24 : 60, 0.045, isMobile ? 5 : 8, false);
     return { tubeGeo: geo, curve: c, midPoint: mid };
-  }, [from, to, isMobile]);
+  }, [from.x, from.y, from.z, to.x, to.y, to.z, isMobile]);
+
+  // Dispose of WebGL geometries properly when curve points shift to avoid GPU memory leaks
+  useEffect(() => {
+    return () => {
+      tubeGeo.dispose();
+    };
+  }, [tubeGeo]);
 
   const uniforms = useMemo(
     () => ({
@@ -89,10 +96,11 @@ function FlowTube({
 
     // single elegant leading pulse traveling along the curve
     const t = (time * 0.35) % 1;
-    const p = curve.getPointAt(t);
-    if (headRef.current) headRef.current.position.copy(p);
+    if (headRef.current) {
+      curve.getPointAt(t, headRef.current.position);
+    }
     if (!isMobile && headHaloRef.current) {
-      headHaloRef.current.position.copy(p);
+      curve.getPointAt(t, headHaloRef.current.position);
       const s = 1 + Math.sin(time * 4) * 0.08;
       headHaloRef.current.scale.setScalar(s);
     }

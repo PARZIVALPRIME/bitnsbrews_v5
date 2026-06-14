@@ -80,39 +80,81 @@ export function getCameraParamsForLevel(
 export function getFocusedBlockCoordsForLevel(_level: number): { cx: number; cz: number; h: number } | null {
   return null;
 }
+// Internal zero-allocation helpers
+function getCameraParamsForLevelInPlace(
+  level: number,
+  selectedBlockCoords: { cx: number; cz: number; h: number } | null,
+  outPos: THREE.Vector3,
+  outTarget: THREE.Vector3
+): number {
+  const current = ZOOM_LEVELS.find((l) => l.id === level) || ZOOM_LEVELS[1];
+  outPos.set(current.defaultPosition[0], current.defaultPosition[1], current.defaultPosition[2]);
+  outTarget.set(current.defaultTarget[0], current.defaultTarget[1], current.defaultTarget[2]);
+  let fov = current.fov;
 
-function interpolateSpherical(v1: THREE.Vector3, v2: THREE.Vector3, alpha: number, twistAngle: number = 0): THREE.Vector3 {
+  if (selectedBlockCoords && level === 3) {
+    // Shift look target along the camera right direction (-X, +Z) to move the block
+    // to the left viewport area so it is not obscured by the right sidebar.
+    const targetX = selectedBlockCoords.cx - 2.7;
+    const targetZ = selectedBlockCoords.cz + 0.7;
+
+    outTarget.set(targetX, selectedBlockCoords.h + 0.2, targetZ);
+    outPos.set(
+      targetX + 4.5,
+      selectedBlockCoords.h + 11.5,
+      targetZ + 18.0
+    );
+    fov = 24;
+  }
+
+  return fov;
+}
+
+function interpolateSphericalInPlace(
+  v1: THREE.Vector3,
+  v2: THREE.Vector3,
+  alpha: number,
+  twistAngle: number,
+  outVec: THREE.Vector3
+): void {
   const r1 = v1.length();
   const r2 = v2.length();
-  
-  // Interpolate distance from target
   const r = r1 + (r2 - r1) * alpha;
-  if (r < 0.001) return new THREE.Vector3();
+  if (r < 0.001) {
+    outVec.set(0, 0, 0);
+    return;
+  }
   
-  // Get polar angle (theta) from Y-axis
   const theta1 = Math.acos(THREE.MathUtils.clamp(v1.y / (r1 || 1), -1, 1));
   const theta2 = Math.acos(THREE.MathUtils.clamp(v2.y / (r2 || 1), -1, 1));
   
-  // Get azimuthal angle (phi) around Y-axis
   const phi1 = Math.atan2(v1.z, v1.x);
   const phi2 = Math.atan2(v2.z, v2.x);
   
-  // Interpolate polar angle
   const theta = theta1 + (theta2 - theta1) * alpha;
   
-  // Interpolate azimuthal angle using the shortest path angular transition + helical twist
   let diff = phi2 - phi1;
   diff = Math.atan2(Math.sin(diff), Math.cos(diff));
   const phi = phi1 + diff * alpha + twistAngle;
   
-  // Convert spherical coords back to Cartesian Vector3
   const sinTheta = Math.sin(theta);
   const x = r * sinTheta * Math.cos(phi);
   const z = r * sinTheta * Math.sin(phi);
   const y = r * Math.cos(theta);
   
-  return new THREE.Vector3(x, y, z);
+  outVec.set(x, y, z);
 }
+
+// Module-level static vectors for interpolation to prevent garbage collection pressure
+const _basePos = new THREE.Vector3();
+const _baseTarget = new THREE.Vector3();
+const _targetPos = new THREE.Vector3();
+const _targetTarget = new THREE.Vector3();
+const _relP1 = new THREE.Vector3();
+const _relP2 = new THREE.Vector3();
+const _relPos = new THREE.Vector3();
+const _posScratch = new THREE.Vector3();
+const _targetScratch = new THREE.Vector3();
 
 export function getCameraParamsInterpolated(
   levelFloat: number,
@@ -125,42 +167,38 @@ export function getCameraParamsInterpolated(
   // Apply slow-in/slow-out easing (smoothstep) for cinematic acceleration
   const alpha = rawAlpha * rawAlpha * (3 - 2 * rawAlpha);
 
-  // Retrieve focused coords specific to base and target levels to prevent coordinate jumps during transitions
   const baseFocusCoords = selectedBlockCoords || getFocusedBlockCoordsForLevel(baseLevel);
   const targetFocusCoords = selectedBlockCoords || getFocusedBlockCoordsForLevel(targetLevel);
 
-  const baseParams = getCameraParamsForLevel(baseLevel, baseFocusCoords);
-  const targetParams = getCameraParamsForLevel(targetLevel, targetFocusCoords);
+  const baseFov = getCameraParamsForLevelInPlace(baseLevel, baseFocusCoords, _basePos, _baseTarget);
+  const targetFov = getCameraParamsForLevelInPlace(targetLevel, targetFocusCoords, _targetPos, _targetTarget);
 
   // Linearly interpolate the look-at focus target
-  const target = new THREE.Vector3().lerpVectors(baseParams.target, targetParams.target, alpha);
+  _targetScratch.lerpVectors(_baseTarget, _targetTarget, alpha);
 
   // Compute relative camera coordinates from the target
-  const relP1 = baseParams.position.clone().sub(target);
-  const relP2 = targetParams.position.clone().sub(target);
+  _relP1.subVectors(_basePos, _targetScratch);
+  _relP2.subVectors(_targetPos, _targetScratch);
 
   // Add lateral helical / orbital swing on Chapter 1 -> 2 transition (System Casing -> Silicon Die)
   let twistAngle = 0;
   let roll = 0;
   if (baseLevel === 1 && targetLevel === 2) {
-    // Wide sweeping orbital arc — the camera traces a dramatic helix as it dives in
     twistAngle = Math.sin(alpha * Math.PI) * 0.7;
     roll = -Math.sin(alpha * Math.PI) * 0.22; // deep cinematic camera bank/roll
   }
 
   // Interpolate camera relative coordinates spherically to pivot around the focus point
-  const relPos = interpolateSpherical(relP1, relP2, alpha, twistAngle);
-  const position = target.clone().add(relPos);
+  interpolateSphericalInPlace(_relP1, _relP2, alpha, twistAngle, _relPos);
+  _posScratch.addVectors(_targetScratch, _relPos);
 
-  // Cinematic Flyover Arc: Add a vertical lift proportional to distance to create a dynamic flyby swoop
-  const dist = baseParams.position.distanceTo(targetParams.position);
-  // Chapter 1→2 gets a bigger arc for dramatic reveal; others stay subtle
+  // Cinematic Flyover Arc
+  const dist = _basePos.distanceTo(_targetPos);
   const arcScale = (baseLevel === 1 && targetLevel === 2) ? 0.22 : 0.14;
   const flyover = Math.sin(alpha * Math.PI) * (dist * arcScale);
-  position.y += flyover;
+  _posScratch.y += flyover;
 
-  // Linear interpolation for field of view (FOV)
-  const fov = baseParams.fov + (targetParams.fov - baseParams.fov) * alpha;
+  const fov = baseFov + (targetFov - baseFov) * alpha;
 
-  return { position, target, fov, roll };
+  return { position: _posScratch, target: _targetScratch, fov, roll };
 }

@@ -322,8 +322,7 @@ function RainbowDatastreams() {
       const tVal = (time * path.speed + path.offset) % 1.0;
       const mesh = packetRefs.current[i];
       if (mesh) {
-        const pos = path.curve.getPointAt(tVal);
-        mesh.position.copy(pos);
+        path.curve.getPointAt(tVal, mesh.position);
       }
     });
   });
@@ -517,6 +516,20 @@ function CameraController({
     damping: 14,
   });
 
+  // Pre-allocated scratch vectors to avoid per-frame allocations
+  const _scratchPosDiff = useRef(new THREE.Vector3());
+  const _scratchPosAccel = useRef(new THREE.Vector3());
+  const _scratchPosVelScaled = useRef(new THREE.Vector3());
+  
+  const _scratchTargetDiff = useRef(new THREE.Vector3());
+  const _scratchTargetAccel = useRef(new THREE.Vector3());
+  const _scratchTargetVelScaled = useRef(new THREE.Vector3());
+  
+  const _scratchDriftVec = useRef(new THREE.Vector3());
+  const _scratchFinalPos = useRef(new THREE.Vector3());
+  const _scratchForward = useRef(new THREE.Vector3());
+  const _scratchUp = useRef(new THREE.Vector3());
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -533,7 +546,7 @@ function CameraController({
     const time = state.clock.getElapsedTime();
     const dt = Math.min(0.03, delta);
 
-    // Get camera params dynamically
+    // Get camera params dynamically (returns static shared references, so we must copy/read immediately)
     const targetParams = getCameraParamsInterpolated(levelFloat, selectedBlockCoords);
 
     if (!initialized.current) {
@@ -549,19 +562,23 @@ function CameraController({
     posSpring.current.target.copy(targetParams.position);
     targetSpring.current.target.copy(targetParams.target);
 
-    // Solve position spring
+    // Solve position spring in-place
     const pSpring = posSpring.current;
-    const pDiff = new THREE.Vector3().subVectors(pSpring.current, pSpring.target);
-    const pAccel = pDiff.clone().multiplyScalar(-pSpring.stiffness).sub(pSpring.velocity.clone().multiplyScalar(pSpring.damping));
-    pSpring.velocity.add(pAccel.multiplyScalar(dt));
-    pSpring.current.add(pSpring.velocity.clone().multiplyScalar(dt));
+    _scratchPosDiff.current.subVectors(pSpring.current, pSpring.target);
+    _scratchPosAccel.current.copy(_scratchPosDiff.current).multiplyScalar(-pSpring.stiffness);
+    _scratchPosVelScaled.current.copy(pSpring.velocity).multiplyScalar(pSpring.damping);
+    _scratchPosAccel.current.sub(_scratchPosVelScaled.current);
+    pSpring.velocity.addScaledVector(_scratchPosAccel.current, dt);
+    pSpring.current.addScaledVector(pSpring.velocity, dt);
 
-    // Solve target spring
+    // Solve target spring in-place
     const tSpring = targetSpring.current;
-    const tDiff = new THREE.Vector3().subVectors(tSpring.current, tSpring.target);
-    const tAccel = tDiff.clone().multiplyScalar(-tSpring.stiffness).sub(tSpring.velocity.clone().multiplyScalar(tSpring.damping));
-    tSpring.velocity.add(tAccel.multiplyScalar(dt));
-    tSpring.current.add(tSpring.velocity.clone().multiplyScalar(dt));
+    _scratchTargetDiff.current.subVectors(tSpring.current, tSpring.target);
+    _scratchTargetAccel.current.copy(_scratchTargetDiff.current).multiplyScalar(-tSpring.stiffness);
+    _scratchTargetVelScaled.current.copy(tSpring.velocity).multiplyScalar(tSpring.damping);
+    _scratchTargetAccel.current.sub(_scratchTargetVelScaled.current);
+    tSpring.velocity.addScaledVector(_scratchTargetAccel.current, dt);
+    tSpring.current.addScaledVector(tSpring.velocity, dt);
 
     // Subtle micro-breathing drift
     const driftX = Math.sin(time * 0.35) * 0.08;
@@ -577,16 +594,21 @@ function CameraController({
     parallax.current.x += (targetPX - parallax.current.x) * 0.04;
     parallax.current.y += (targetPY - parallax.current.y) * 0.04;
 
-    const finalPos = pSpring.current.clone().add(
-      new THREE.Vector3(driftX + parallax.current.x, driftY + parallax.current.y, driftZ)
+    // finalPos = pSpring.current + drift + parallax
+    _scratchFinalPos.current.copy(pSpring.current);
+    _scratchDriftVec.current.set(
+      driftX + parallax.current.x,
+      driftY + parallax.current.y,
+      driftZ
     );
+    _scratchFinalPos.current.add(_scratchDriftVec.current);
 
     // Apply flight-sim style roll banking around forward direction
-    const forward = new THREE.Vector3().subVectors(tSpring.current, pSpring.current).normalize();
-    const upVector = new THREE.Vector3(0, 1, 0).applyAxisAngle(forward, targetParams.roll || 0);
-    camera.up.copy(upVector);
+    _scratchForward.current.subVectors(tSpring.current, pSpring.current).normalize();
+    _scratchUp.current.set(0, 1, 0).applyAxisAngle(_scratchForward.current, targetParams.roll || 0);
+    camera.up.copy(_scratchUp.current);
 
-    camera.position.copy(finalPos);
+    camera.position.copy(_scratchFinalPos.current);
     targetRef.current.copy(tSpring.current);
     camera.lookAt(targetRef.current);
 
@@ -693,7 +715,7 @@ interface SceneProps {
   selected: string | null;
   setSelected: (id: string | null) => void;
   mode: SocMode;
-  targetLevel: number;
+  targetLevelRef: React.RefObject<number>;
   visMode?: string;
   uiTransitionRef?: React.RefObject<{
     onUpdate: (levelFloat: number) => void;
@@ -708,14 +730,14 @@ export function Scene({
   selected,
   setSelected,
   mode,
-  targetLevel,
+  targetLevelRef,
   visMode = "physical",
   uiTransitionRef,
   showPlayground = false,
   playgroundShowLabels = true,
   interactionRef,
 }: SceneProps) {
-  const [level, setLevel] = useState(Math.round(targetLevel));
+  const [level, setLevel] = useState(Math.round(targetLevelRef.current ?? 1.0));
   const { camera } = useThree();
 
   useEffect(() => {
@@ -739,8 +761,8 @@ export function Scene({
   }, [camera, interactionRef]);
 
   const spring = useRef({
-    current: targetLevel,
-    target: targetLevel,
+    current: targetLevelRef.current ?? 1.0,
+    target: targetLevelRef.current ?? 1.0,
     velocity: 0,
     stiffness: 45, // Low stiffness for slow cinematic transition
     damping: 12,   // Gentle damping for smooth deceleration
@@ -751,7 +773,15 @@ export function Scene({
 
   useFrame((_, delta) => {
     const s = spring.current;
+    const targetLevel = targetLevelRef.current ?? 1.0;
+
+    // If target changed, we are no longer settled
+    const targetChanged = s.target !== targetLevel;
     s.target = targetLevel;
+
+    if (!targetChanged && s.current === s.target && s.velocity === 0) {
+      return; // Skip settled frames completely!
+    }
 
     // Clamp delta to avoid huge jumps on frame drops
     const dt = Math.min(0.03, delta);

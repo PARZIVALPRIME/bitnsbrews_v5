@@ -67,6 +67,10 @@ export function SocBlock({
   const selectCur = useRef(0);
   const settled = useRef(false);
   const frameSkip = useRef(0);
+  const lastPlaygroundT = useRef(playgroundT);
+  const lastPlaygroundShowLabels = useRef(playgroundShowLabels);
+  const lastVisMode = useRef(visMode);
+  const lastDimmed = useRef(dimmed);
 
   const edgeStrip = block.detail === "lpddr" || block.detail === "ioring";
   const w = Math.max(0.1, block.w - (edgeStrip ? 0 : GAP));
@@ -91,10 +95,55 @@ export function SocBlock({
   useFrame((state, delta) => {
     const levelFloat = globalLevelState.current;
 
-    // Update local level state when it crosses integer boundary
+    const isCameraMoving = globalLevelState.current !== globalLevelState.target;
+    const pTChanged = showPlayground && (playgroundT !== lastPlaygroundT.current);
+    const pLChanged = showPlayground && (playgroundShowLabels !== lastPlaygroundShowLabels.current);
+    const vMChanged = visMode !== lastVisMode.current;
+    const dimmedChanged = dimmed !== lastDimmed.current;
+
+    lastPlaygroundT.current = playgroundT;
+    lastPlaygroundShowLabels.current = playgroundShowLabels;
+    lastVisMode.current = visMode;
+    lastDimmed.current = dimmed;
+
     const currentLevel = Math.round(levelFloat);
     if (currentLevel !== level) {
       setLevel(currentLevel);
+    }
+
+    if (isMobile) {
+      frameSkip.current = (frameSkip.current + 1) % 2;
+    }
+    const doMatUpdate = !isMobile || frameSkip.current === 0;
+
+    const galleryPulse = level === 3 && isArticleBlock && !isMobile;
+    const blockOpacity = 0.85 + 0.15 * Math.max(0, Math.min(1, levelFloat - 1.0));
+    const isThermalMode = visMode === "thermal";
+
+    const inputChanged = 
+      isCameraMoving ||
+      dimmedChanged ||
+      pTChanged ||
+      pLChanged ||
+      vMChanged ||
+      modeUtilization !== utilCur.current ||
+      (selected ? 1 : 0) !== selectCur.current ||
+      (hovered && !dimmed ? 1 : 0) !== hoverCur.current;
+
+    if (settled.current && !inputChanged && !isThermalMode) {
+      if (galleryPulse && doMatUpdate && bodyMat.current) {
+        const time = state.clock.getElapsedTime();
+        const pulse = (Math.sin(time * 1.6 + cx * 0.7 + cz * 0.5) * 0.5 + 0.5) * 0.22;
+        const dimF = dimmed ? 0.06 : 1;
+        bodyMat.current.emissiveIntensity = (utilCur.current * 0.6 + pulse) * dimF * blockOpacity;
+        if (capMat.current) {
+          capMat.current.emissiveIntensity = (utilCur.current * 0.36 + pulse * 0.8) * dimF * blockOpacity;
+        }
+        if (outlineMat.current) {
+          outlineMat.current.opacity = (dimmed ? 0.04 : 0.22 + pulse * 0.8) * blockOpacity;
+        }
+      }
+      return;
     }
 
     // Calculate smooth label opacity based on levelFloat
@@ -136,11 +185,6 @@ export function SocBlock({
       labelDivRef.current.style.opacity = `${labelOpacity}`;
       labelDivRef.current.style.pointerEvents = labelOpacity > 0.15 ? "auto" : "none";
     }
-
-    if (isMobile) {
-      frameSkip.current = (frameSkip.current + 1) % 2;
-    }
-    const doMatUpdate = !isMobile || frameSkip.current === 0;
 
     // 1. Calculate gallery transition progress (Level 2 to Level 3)
     //    In playground mode, use the explode slider value directly.
@@ -207,8 +251,6 @@ export function SocBlock({
     const selectLift = selectCur.current * 0.3;
     const totalY = y + microLift + hoverLift + selectLift + rippleLift;
 
-    const blockOpacity = 0.85 + 0.15 * Math.max(0, Math.min(1, levelFloat - 1.0));
-
     const motion =
       Math.abs(staggeredT - cur.current) +
       Math.abs(modeUtilization - utilCur.current) +
@@ -219,7 +261,6 @@ export function SocBlock({
     settled.current = motion < 0.005;
 
     // Gallery knowledge-map breathing pulse setting
-    const galleryPulse = level === 3 && isArticleBlock && !isMobile;
 
     if (settled.current && wasSettled && cur.current === staggeredT) {
       if (visMode === "thermal" && thermalMat.current) {
