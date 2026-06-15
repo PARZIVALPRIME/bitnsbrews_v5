@@ -119,7 +119,7 @@ export default async function ArticlePage({
       <div className="max-w-[1020px] mx-auto px-6 sm:px-8 pt-28 pb-32 flex gap-12 items-start justify-center">
         <ArticleToc items={toc} />
 
-        <article className="max-w-[700px] flex-grow">
+        <article className="max-w-[700px] flex-grow min-w-0">
           <header className="mb-14">
             {meta.track && (
               <div className="flex items-center gap-3 mb-7">
@@ -153,16 +153,19 @@ export default async function ArticlePage({
             </div>
           </header>
 
-          <MDXRemote
-            source={content}
-            components={{ ...mdxComponents, ...visualizers }}
-            options={{
-              mdxOptions: {
-                remarkPlugins: [remarkGfm],
-                rehypePlugins: [rehypeSlug],
-              },
-            }}
-          />
+          {/* Lead paragraph (first <p>) gets a larger, brighter editorial treatment. */}
+          <div className="[&>p:first-of-type]:text-[19px] [&>p:first-of-type]:leading-[1.7] [&>p:first-of-type]:text-white/85 [&>p:first-of-type]:mb-8">
+            <MDXRemote
+              source={content}
+              components={{ ...mdxComponents, ...visualizers }}
+              options={{
+                mdxOptions: {
+                  remarkPlugins: [remarkGfm],
+                  rehypePlugins: [rehypeSlug],
+                },
+              }}
+            />
+          </div>
 
           <footer className="mt-16">
             <div className="flex items-center gap-3 justify-center mb-10">

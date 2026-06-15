@@ -129,6 +129,14 @@ html {
   scrollbar-color: rgba(255, 255, 255, 0.15) var(--bg);
 }
 
+/* Smooth in-page anchor jumps (e.g. article TOC). The immersive landing uses a
+   fixed, virtual-scrolled canvas, so this only affects normal content pages. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 /* Newsletter success check */
 @keyframes checkmarkDraw {
   to {
