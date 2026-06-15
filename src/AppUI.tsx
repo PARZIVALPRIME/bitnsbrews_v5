@@ -6,7 +6,7 @@ import { CHAPTERS, TOTAL } from "./chapters";
 import { getArticleForLevel, parseMarkdown } from "./chapterArticles";
 import { TRACKS, getTrackArticle } from "./trackArticles";
 import { getArticle } from "./articles";
-import { Footer } from "./components/Footer";
+import { SiteFooter } from "./components/SiteFooter";
 import { BLOCKS } from "./soc/data";
 import { ARTICLE_BLOCK_IDS } from "./articles";
 import { TrackIcon } from "./components/TrackIcon";
@@ -837,19 +837,8 @@ export function AppUI({ sceneComponent: SceneComp }: UiProps) {
 
         </div>
 
-        {/* ── Subscribe Newsletter: Full Sweep Footer ── */}
-        <Footer
-          onNavigateToDie={() => {
-            goToLevel(2);
-            setShowPlayground(true);
-          }}
-          onNavigateToTracks={() => {
-            const el = document.getElementById("hub-catalog-container");
-            if (el) {
-              el.scrollTo({ top: 380, behavior: "smooth" });
-            }
-          }}
-        />
+        {/* Unified site footer (newsletter + links), shared with content pages */}
+        <SiteFooter />
       </div>
 
       {/* ── Bottom: progress bar + scroll hint ───────────────────────────── */}

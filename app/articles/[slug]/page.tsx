@@ -13,6 +13,8 @@ import {
 import { mdxComponents } from "@/components/mdx";
 import { visualizers } from "@/components/visualizers";
 import { ReadingProgress } from "@/components/article/ReadingProgress";
+import { SiteNav } from "@/components/SiteNav";
+import { SiteFooter } from "@/components/SiteFooter";
 import { ArticleToc } from "@/components/article/ArticleToc";
 
 // Statically generate a page for every published article at build time.
@@ -97,24 +99,7 @@ export default async function ArticlePage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Top chrome */}
-      <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-6 sm:px-10 h-16 bg-gradient-to-b from-[#0b0d12] via-[#0b0d12]/85 to-transparent pointer-events-none">
-        <Link
-          href="/"
-          className="pointer-events-auto text-[13px] font-semibold tracking-[-0.01em] text-white/50 hover:text-white/80 transition-colors"
-        >
-          Bits&apos;nBrews
-        </Link>
-        <Link
-          href="/"
-          className="pointer-events-auto group flex items-center gap-2 text-[12px] font-medium text-white/55 hover:text-white/90 border border-white/12 hover:border-white/25 rounded-lg px-4 py-2 transition-colors duration-200 bg-[#12151d]"
-        >
-          <span className="inline-block transition-transform duration-200 group-hover:-translate-x-0.5">
-            ←
-          </span>
-          <span>Back to the die</span>
-        </Link>
-      </div>
+      <SiteNav />
 
       <div className="max-w-[1020px] mx-auto px-6 sm:px-8 pt-28 pb-32 flex gap-12 items-start justify-center">
         <ArticleToc items={toc} />
@@ -184,6 +169,8 @@ export default async function ArticlePage({
           </footer>
         </article>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

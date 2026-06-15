@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Article, ArticleSegment } from "./articles";
-import { Footer } from "./components/Footer";
+import { SiteFooter } from "./components/SiteFooter";
 
 // ── Tiny inline formatter: **bold**, *italic*, `code` ───────────────────────
 function renderInline(text: string): ReactNode[] {
@@ -414,8 +414,8 @@ export function ArticleReader({ article, onClose, onNavigate }: { article: Artic
           </article>
         </div>
         
-        {/* Render the shared Footer at the bottom of the scroll container */}
-        <Footer />
+        {/* Shared site footer at the bottom of the scroll container */}
+        <SiteFooter />
       </div>
     </div>
   );

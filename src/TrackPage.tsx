@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { TRACKS, type Track } from "./trackArticles";
 import { ARTICLES, type Article } from "./articles";
-import { Footer } from "./components/Footer";
+import { SiteFooter } from "./components/SiteFooter";
 import { TrackIcon } from "./components/TrackIcon";
 
 // Helper to filter and sort articles by date in chronological order (oldest first)
@@ -162,8 +162,8 @@ export function TrackPage({ trackId, onClose, onReadArticle }: TrackPageProps) {
         </section>
       </div>
 
-      {/* Global Footer */}
-      <Footer />
+      {/* Shared site footer */}
+      <SiteFooter />
     </div>
   );
 }
