@@ -31,7 +31,6 @@ interface SceneProps {
 
 interface UiProps {
   sceneComponent: React.ComponentType<SceneProps>;
-  quality?: "desktop" | "mobile";
 }
 
 // Shared label style: quiet uppercase eyebrow — used sparingly, one per section.
@@ -39,7 +38,7 @@ const EYEBROW = "text-[10px] font-medium tracking-[0.12em] uppercase";
 
 
 
-export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop" }: UiProps) {
+export function AppUI({ sceneComponent: SceneComp }: UiProps) {
   // ── State ─────────────────────────────────────────────────────────────────
   // Continuous-scroll journey: `scrollTargetRef` (1..TOTAL) is driven by wheel /
   // touch / keyboard; the 3D scene eases its camera toward it. `activeLevel` is
@@ -205,7 +204,13 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       console.warn("GPU specs check bypassed:", e);
     }
 
-    if (isLowRam || isLowGpu) {
+    // Phones/tablets: start in the lighter tier immediately (don't wait for the
+    // 2s FPS probe). Coarse pointer or a narrow viewport is a strong signal.
+    const isTouchOrSmall =
+      (typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches) ||
+      window.innerWidth < 768;
+
+    if (isLowRam || isLowGpu || isTouchOrSmall) {
       setPerfMode("low");
       setAutoDowngraded(true);
     }
@@ -442,14 +447,14 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       />
 
       {/* ── Top Header Bar ── */}
-      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-8 h-20 pointer-events-none select-none">
+      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 sm:px-8 h-16 sm:h-20 pointer-events-none select-none">
         {/* Wordmark logo */}
         <div className="flex items-center gap-3 pointer-events-auto">
           <div className="text-[13px] font-semibold tracking-[0.22em] text-white uppercase">
             Bits&apos;nBrews
           </div>
-          <span className="h-4 w-px bg-white/12" />
-          <span className="text-[10px] font-mono tracking-wider text-white/40 uppercase">
+          <span className="hidden sm:inline-block h-4 w-px bg-white/12" />
+          <span className="hidden sm:inline text-[10px] font-mono tracking-wider text-white/40 uppercase">
             Semiconductor Explorer
           </span>
         </div>
@@ -471,7 +476,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
             </kbd>
           </button>
 
-          <div className="relative flex items-center">
+          <div className="relative hidden sm:flex items-center">
             {showPerfPrompt && perfMode === "high" && (
               <div className="absolute top-[calc(100%+8px)] right-0 flex items-center gap-2 bg-[#ff4a5a] text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-[0_4px_12px_rgba(255,74,90,0.25)] whitespace-nowrap animate-fade-in z-30 border border-white/10 before:content-[''] before:absolute before:-top-1.5 before:right-6 before:border-x-[6px] before:border-x-transparent before:border-b-[6px] before:border-b-[#ff4a5a]">
                 <span>Lagging? Switch to Lite mode for a smoother look!</span>
@@ -498,7 +503,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
           <button
             onClick={() => setT((p) => (p === 0 ? 1 : 0))}
-            className="text-[10px] font-mono font-medium tracking-wider text-white/50 hover:text-white transition-colors duration-200 border border-white/8 hover:border-white/20 px-3.5 py-2 rounded-lg cursor-pointer bg-[#12151d]/90 shadow-sm"
+            className="hidden sm:block text-[10px] font-mono font-medium tracking-wider text-white/50 hover:text-white transition-colors duration-200 border border-white/8 hover:border-white/20 px-3.5 py-2 rounded-lg cursor-pointer bg-[#12151d]/90 shadow-sm"
           >
             {t === 0 ? "EXPLODE" : "ASSEMBLE"}
           </button>
@@ -508,14 +513,14 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       {/* ── Chapter 1: Editorial hero ────────── */}
       <div
         ref={heroPanelRef}
-        className="absolute left-0 top-0 bottom-0 z-20 flex flex-col justify-center pl-16 pr-8 w-[52%] will-change-transform"
+        className="absolute left-0 top-0 bottom-0 z-20 flex flex-col justify-center pl-6 pr-6 sm:pl-16 sm:pr-8 w-full sm:w-[52%] will-change-transform"
         style={{
           opacity: 1,
           transform: "translate3d(0, 0, 0)",
           pointerEvents: "auto",
         }}
       >
-        <h1 className="text-[38px] font-semibold leading-[1.15] tracking-tight text-white/95 mb-6 mt-8">
+        <h1 className="text-[30px] sm:text-[38px] font-semibold leading-[1.15] tracking-tight text-white/95 mb-6 mt-8">
           What&apos;s really inside <br />
           <span className="article-serif italic font-normal text-white/80">your processor.</span>
         </h1>
@@ -525,7 +530,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           right down to the tiny microscopic circuits that make it all work, explaining 
           the magic in simple terms, one layer at a time.
         </p>
-        <div className="flex items-center gap-5">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <button
             onClick={() => goToLevel(2)}
             className="group flex items-center gap-2.5 text-[13px] font-medium text-[#0b0d12] bg-white/95 hover:bg-white transition-all duration-200 px-6 py-3 rounded-lg cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
@@ -551,7 +556,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       {/* ── Chapters 2–4: Compact bottom-left ── */}
       <div
         ref={chapterPanelRef}
-        className="absolute left-8 bottom-12 z-20 w-[420px] text-left will-change-transform"
+        className="absolute left-4 right-4 bottom-20 sm:left-8 sm:right-auto sm:bottom-12 z-20 w-auto sm:w-[420px] text-left will-change-transform"
         style={{
           opacity: 0,
           transform: "translate3d(0, 20px, 0)",
@@ -611,7 +616,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         return (
           <div
             ref={detailPanelRef}
-            className="panel absolute right-8 top-1/2 -translate-y-1/2 z-20 w-[320px] max-h-[65vh] overflow-y-auto rounded-xl p-5 scrollbar-thin will-change-transform"
+            className="panel absolute left-4 right-4 sm:left-auto sm:right-8 top-1/2 -translate-y-1/2 z-20 w-auto sm:w-[320px] max-h-[55vh] sm:max-h-[65vh] overflow-y-auto rounded-xl p-5 scrollbar-thin will-change-transform"
             style={{
               opacity: 0,
               transform: "translate3d(0, -50%, 0)",
@@ -663,7 +668,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       {/* ── Chapter 3: Technical Tracks Menu ───────────────────────────────── */}
       <div
         ref={tracksMenuRef}
-        className="panel absolute top-[110px] left-8 z-20 w-[340px] rounded-xl p-5 text-left flex flex-col max-h-[calc(100vh-410px)] will-change-transform"
+        className="panel absolute top-[88px] sm:top-[110px] left-4 right-4 sm:left-8 sm:right-auto z-20 w-auto sm:w-[340px] rounded-xl p-5 text-left flex flex-col max-h-[42vh] sm:max-h-[calc(100vh-410px)] will-change-transform"
         style={{
           opacity: 0,
           transform: "translate3d(0, -12px, 0)",
