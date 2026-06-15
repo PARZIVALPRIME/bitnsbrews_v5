@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useRef, useCallback, startTransition } from "react";
+import { lazy, Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import { QualityContext } from "./soc/quality";
@@ -26,6 +26,7 @@ interface SceneProps {
   targetLevel: number;
   visMode: string;
   uiTransitionRef?: React.MutableRefObject<{ onUpdate: (levelFloat: number) => void } | null>;
+  scrollTargetRef?: React.MutableRefObject<number>;
 }
 
 interface UiProps {
@@ -40,8 +41,15 @@ const EYEBROW = "text-[10px] font-medium tracking-[0.12em] uppercase";
 
 export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop" }: UiProps) {
   // ── State ─────────────────────────────────────────────────────────────────
-  const [targetLevel, setTargetLevel] = useState(1);       // snap destination (1-7)
-  const [chapterVisible, setChapterVisible] = useState(true); // text fade state
+  // Continuous-scroll journey: `scrollTargetRef` (1..TOTAL) is driven by wheel /
+  // touch / keyboard; the 3D scene eases its camera toward it. `activeLevel` is
+  // the rounded level the camera is currently at — it gates which overlays mount
+  // (all existing render logic reads it via the `targetLevel` alias below).
+  const [activeLevel, setActiveLevel] = useState(1);
+  const targetLevel = activeLevel;                          // alias for existing render logic
+  const activeLevelRef = useRef(1);
+  const scrollTargetRef = useRef(1);
+  const [chapterVisible] = useState(true); // text fade state (kept visible; panels fade via levelFloat)
   const [t, setT] = useState(0.0);
   const [visMode] = useState("physical");
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
@@ -83,6 +91,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   const tracksMenuRef = useRef<HTMLDivElement>(null);
   const detailPanelRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const progressFillRef = useRef<HTMLDivElement>(null);
 
   const uiTransitionRef = useRef<{ onUpdate: (levelFloat: number) => void } | null>(null);
   const mouse = useRef({ x: 0, y: 0 });
@@ -146,6 +155,18 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
       const opacity = Math.max(0, 1 - Math.max(0, levelFloat - 4) * 2.2);
       progressBarRef.current.style.opacity = `${opacity}`;
       progressBarRef.current.style.pointerEvents = opacity > 0.15 ? "auto" : "none";
+    }
+    if (progressFillRef.current) {
+      const p = Math.max(0, Math.min(1, (levelFloat - 1) / (TOTAL - 1)));
+      progressFillRef.current.style.width = `${p * 100}%`;
+    }
+
+    // Sync the rounded "active level" to the camera's visual position so overlays
+    // mount/unmount in step with what's on screen.
+    const rounded = Math.max(1, Math.min(TOTAL, Math.round(levelFloat)));
+    if (rounded !== activeLevelRef.current) {
+      activeLevelRef.current = rounded;
+      setActiveLevel(rounded);
     }
   }, []);
 
@@ -234,113 +255,85 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     targetLevelRef.current = targetLevel;
   }, [targetLevel]);
 
-  // ── Scroll accumulator (avoids skipping chapters on fast scrolling) ───────
-  const accumRef = useRef(0);
-  const cooldownRef = useRef(false);
+  // Jump the journey to a specific level (the scene eases there smoothly).
+  const goToLevel = useCallback((lvl: number) => {
+    scrollTargetRef.current = Math.max(1, Math.min(TOTAL, lvl));
+  }, []);
 
-  // ── Snap-to-chapter scroll: wheel + keyboard ──────────────────────────────
+  // ── Continuous virtual scroll: wheel + touch + keyboard drive a 1..TOTAL
+  //    position; the scene eases its camera toward it (that easing is the
+  //    inertia). No snapping, no chapter steps — one continuous journey. ───────
   useEffect(() => {
-    const advance = (dir: 1 | -1) => {
-      startTransition(() => {
-        setTargetLevel((prev) => {
-          const next = Math.max(1, Math.min(TOTAL, prev + dir));
-          if (next !== prev) {
-            // Briefly hide chapter text so it fades back in for new chapter
-            setChapterVisible(false);
-            setTimeout(() => setChapterVisible(true), 320);
-          }
-          return next;
-        });
-      });
+    const WHEEL_SENS = 0.0022; // levels per wheel delta unit
+    const TOUCH_SENS = 0.006;  // levels per px dragged
+
+    const nudge = (delta: number) => {
+      scrollTargetRef.current = Math.max(1, Math.min(TOTAL, scrollTargetRef.current + delta));
+    };
+
+    const nativeScrollEl = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      return el
+        ? (el.closest(".overflow-y-auto, .overflow-y-scroll, .scrollbar-thin, input[type='range']") as HTMLElement | null)
+        : null;
+    };
+
+    // Inside the Hub (level 5) the catalog scrolls natively; we only re-capture
+    // when the user is at the top of the catalog and scrolling/dragging up.
+    const hubBlocks = (goingUp: boolean) => {
+      if (activeLevelRef.current !== 5) return false;
+      const container = document.getElementById("hub-catalog-container");
+      const atTop = !container || container.scrollTop <= 0;
+      return !(atTop && goingUp);
     };
 
     const handleWheel = (e: WheelEvent) => {
-      // Article reader open: let it scroll natively, never navigate chapters.
       if (readerOpenRef.current) return;
+      if (hubBlocks(e.deltaY < 0)) return;          // let the hub catalog scroll
+      if (activeLevelRef.current !== 5 && nativeScrollEl(e.target)) return; // panels scroll natively
+      e.preventDefault();
+      nudge(e.deltaY * WHEEL_SENS);
+    };
 
-      const currentLvl = targetLevelRef.current;
-      const target = e.target as HTMLElement | null;
-
-      // Find if we are scrolling inside any scrollable overlay container
-      const scrollContainer = target ? target.closest(".overflow-y-auto, .overflow-y-scroll, .scrollbar-thin, input[type='range']") as HTMLElement | null : null;
-
-      if (scrollContainer) {
-        // Special case: on the Hub (level 5), we let the user scroll back up to level 4 once they reach the top of the catalog
-        if (currentLvl === 5 && scrollContainer.id === "hub-catalog-container") {
-          const isAtTop = scrollContainer.scrollTop <= 0;
-          const isScrollingUp = e.deltaY < 0;
-
-          if (isAtTop && isScrollingUp) {
-            // Do not return, let it proceed to chapter transition logic
-            e.preventDefault();
-          } else {
-            // Let the catalog container scroll naturally
-            return;
-          }
-        } else {
-          // For any other scrollable containers (Chapter 3 sidebar, details panel, etc.),
-          // completely ignore chapter navigation and let them scroll natively
-          return;
-        }
-      }
-
-      // If we are not inside a scroll container, or we passed the Hub top-scroll check:
-      if (currentLvl === 5) {
-        const container = document.getElementById("hub-catalog-container");
-        if (container) {
-          const isAtTop = container.scrollTop <= 0;
-          const isScrollingUp = e.deltaY < 0;
-          if (isAtTop && isScrollingUp) {
-            e.preventDefault();
-          } else {
-            return;
-          }
-        }
-      } else {
-        e.preventDefault();
-      }
-
-      if (cooldownRef.current) return;
-      accumRef.current += e.deltaY;
-      const threshold = 120;
-      if (accumRef.current > threshold) {
-        advance(1);
-        accumRef.current = 0;
-        cooldownRef.current = true;
-        setTimeout(() => { cooldownRef.current = false; }, 400);
-      } else if (accumRef.current < -threshold) {
-        advance(-1);
-        accumRef.current = 0;
-        cooldownRef.current = true;
-        setTimeout(() => { cooldownRef.current = false; }, 400);
-      }
+    let lastTouchY: number | null = null;
+    const handleTouchStart = (e: TouchEvent) => {
+      lastTouchY = e.touches[0]?.clientY ?? null;
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (readerOpenRef.current || lastTouchY === null) return;
+      const y = e.touches[0]?.clientY ?? lastTouchY;
+      const dy = lastTouchY - y;
+      lastTouchY = y;
+      if (hubBlocks(dy < 0)) return;
+      if (activeLevelRef.current !== 5 && nativeScrollEl(e.target)) return;
+      if (e.cancelable) e.preventDefault();
+      nudge(dy * TOUCH_SENS);
+    };
+    const handleTouchEnd = () => {
+      lastTouchY = null;
     };
 
     const handleKey = (e: KeyboardEvent) => {
-      if (readerOpenRef.current) return;
-      const currentLvl = targetLevelRef.current;
-
-      // On the final Hub page, only let ArrowUp/PageUp capture navigation if we are at the top
-      if (currentLvl === 5) {
-        const container = document.getElementById("hub-catalog-container");
-        if (container) {
-          const isAtTop = container.scrollTop <= 0;
-          if (["ArrowUp", "PageUp"].includes(e.key) && isAtTop) {
-            e.preventDefault();
-            advance(-1);
-          }
-        }
-        return;
+      if (readerOpenRef.current || activeLevelRef.current === 5) return;
+      if (["ArrowDown", "PageDown", " "].includes(e.key)) {
+        e.preventDefault();
+        nudge(e.key === " " ? 0.6 : 0.35);
+      } else if (["ArrowUp", "PageUp"].includes(e.key)) {
+        e.preventDefault();
+        nudge(-0.35);
       }
-      
-      if (["ArrowDown", "PageDown"].includes(e.key)) { e.preventDefault(); advance(1); }
-      if (["ArrowUp", "PageUp"].includes(e.key))   { e.preventDefault(); advance(-1); }
     };
 
     window.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd);
     window.addEventListener("keydown", handleKey);
     return () => {
       window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
       window.removeEventListener("keydown", handleKey);
     };
   }, []);
@@ -422,6 +415,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
                   targetLevel={targetLevel}
                   visMode={visMode}
                   uiTransitionRef={uiTransitionRef}
+                  scrollTargetRef={scrollTargetRef}
                 />
               </Suspense>
             </PerformanceMonitor>
@@ -533,11 +527,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         </p>
         <div className="flex items-center gap-5">
           <button
-            onClick={() => {
-              setTargetLevel(2);
-              setChapterVisible(false);
-              setTimeout(() => setChapterVisible(true), 320);
-            }}
+            onClick={() => goToLevel(2)}
             className="group flex items-center gap-2.5 text-[13px] font-medium text-[#0b0d12] bg-white/95 hover:bg-white transition-all duration-200 px-6 py-3 rounded-lg cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]"
           >
             <span>Start the journey</span>
@@ -545,11 +535,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           </button>
           <button
             onClick={() => {
-              setTargetLevel(5);
+              goToLevel(5);
               setTimeout(() => {
                 const el = document.getElementById("hub-catalog-container");
                 if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-              }, 100);
+              }, 900);
             }}
             className="text-[13px] font-medium text-white/70 hover:text-white transition-colors cursor-pointer tracking-wider"
           >
@@ -669,45 +659,6 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           ))}
         </div>
       )}
-
-      {/* ── Right side: Chapter navigation dots ──────────────────────────── */}
-      <div
-        className="absolute right-8 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3 items-center transition-all duration-500"
-        style={{
-          opacity: targetLevel >= 4 ? 0 : 1,
-          pointerEvents: targetLevel >= 4 ? "none" : "auto",
-        }}
-      >
-        {CHAPTERS.map((c) => (
-          <button
-            key={c.level}
-            onClick={() => {
-              setTargetLevel(c.level);
-              setChapterVisible(false);
-              setTimeout(() => setChapterVisible(true), 320);
-            }}
-            title={c.title}
-            className="group relative flex items-center justify-end gap-2"
-          >
-            {/* Label on hover */}
-            <span className="absolute right-6 text-[11px] font-medium text-white/60 opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap">
-              {c.title}
-            </span>
-            {/* Bar */}
-            <div
-              className="transition-all duration-300 rounded-full"
-              style={{
-                width: "3px",
-                height: targetLevel === c.level ? "22px" : "10px",
-                backgroundColor:
-                  targetLevel === c.level
-                    ? "#8aa9ff"
-                    : "rgba(255,255,255,0.22)",
-              }}
-            />
-          </button>
-        ))}
-      </div>
 
       {/* ── Chapter 3: Technical Tracks Menu ───────────────────────────────── */}
       <div
@@ -882,9 +833,9 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         </div>
 
         {/* ── Subscribe Newsletter: Full Sweep Footer ── */}
-        <Footer 
+        <Footer
           onNavigateToDie={() => {
-            setTargetLevel(2);
+            goToLevel(2);
             setShowPlayground(true);
           }}
           onNavigateToTracks={() => {
@@ -905,22 +856,17 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           pointerEvents: "auto",
         }}
       >
-        {/* Progress bar */}
+        {/* Continuous journey progress — width driven per-frame in onUpdate */}
         <div className="flex-1 h-px bg-white/[0.08] relative overflow-hidden rounded-full">
           <div
-            className="absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-in-out bg-[#8aa9ff]/70"
-            style={{
-              width: `${((targetLevel - 1) / (TOTAL - 1)) * 100}%`,
-            }}
+            ref={progressFillRef}
+            className="absolute left-0 top-0 h-full rounded-full bg-[#8aa9ff]/70"
+            style={{ width: "0%" }}
           />
         </div>
-        {/* Chapter counter */}
-        <div className="text-[11px] font-mono text-white/35 shrink-0">
-          {String(targetLevel).padStart(2, "0")} / {String(TOTAL).padStart(2, "0")}
-        </div>
-        {/* Scroll hint — fades after first interaction */}
+        {/* Scroll hint */}
         <div className="text-[11px] text-white/30 shrink-0">
-          Scroll or use arrow keys
+          Scroll to explore
         </div>
       </div>
 

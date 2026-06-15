@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAllArticles, type ArticleMeta } from "@/lib/articles";
+import { SiteNav } from "@/components/SiteNav";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "Articles",
@@ -42,22 +44,9 @@ export default function ArticlesIndex() {
 
   return (
     <div className="min-h-screen bg-[#0b0d12]">
-      <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-6 sm:px-10 h-16 bg-gradient-to-b from-[#0b0d12] via-[#0b0d12]/85 to-transparent pointer-events-none">
-        <Link
-          href="/"
-          className="pointer-events-auto text-[13px] font-semibold tracking-[-0.01em] text-white/50 hover:text-white/80 transition-colors"
-        >
-          Bits&apos;nBrews
-        </Link>
-        <Link
-          href="/"
-          className="pointer-events-auto text-[12px] font-medium text-white/55 hover:text-white/90 border border-white/12 hover:border-white/25 rounded-lg px-4 py-2 transition-colors duration-200 bg-[#12151d]"
-        >
-          ← The die
-        </Link>
-      </div>
+      <SiteNav />
 
-      <div className="max-w-[760px] mx-auto px-6 sm:px-8 pt-28 pb-32">
+      <div className="max-w-[760px] mx-auto px-6 sm:px-8 pt-28 pb-24">
         <header className="mb-14">
           <h1 className="article-serif text-[40px] sm:text-[48px] font-bold leading-[1.1] tracking-[-0.02em] text-white/95 mb-4">
             Articles
@@ -78,6 +67,8 @@ export default function ArticlesIndex() {
           </div>
         )}
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

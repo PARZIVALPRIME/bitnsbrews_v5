@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { DISCORD_URL } from "@/lib/site";
 
 interface FooterProps {
   onNavigateToDie?: () => void;
@@ -119,9 +120,9 @@ export function Footer({ onNavigateToDie, onNavigateToTracks }: FooterProps) {
             >
               Tracks
             </button>
-            <a href="#" className="hover:text-[#8aa9ff] transition-colors uppercase">About</a>
-            <a href="#" className="hover:text-[#8aa9ff] transition-colors uppercase">Contact</a>
-            <a href="#" className="hover:text-[#8aa9ff] transition-colors uppercase">Terms</a>
+            <a href="/about" className="hover:text-[#8aa9ff] transition-colors uppercase">About</a>
+            <a href="/contact" className="hover:text-[#8aa9ff] transition-colors uppercase">Contact</a>
+            <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#8aa9ff] transition-colors uppercase">Discord</a>
           </div>
         </div>
         

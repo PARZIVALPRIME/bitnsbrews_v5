@@ -608,6 +608,9 @@ interface SceneProps {
   uiTransitionRef?: React.MutableRefObject<{
     onUpdate: (levelFloat: number) => void;
   } | null>;
+  /** Continuous scroll position (1..TOTAL). When provided, the scene follows it
+      directly instead of easing toward the integer `targetLevel`. */
+  scrollTargetRef?: React.MutableRefObject<number>;
 }
 
 function getStaggeredT(blockId: string, manualT: number): number {
@@ -634,31 +637,32 @@ export function Scene({
   targetLevel,
   visMode = "physical",
   uiTransitionRef,
+  scrollTargetRef,
 }: SceneProps) {
   const [levelFloat, setLevelFloat] = useState(targetLevel);
   const levelFloatRef = useRef(targetLevel);
 
+  // Continuously ease the rendered levelFloat toward the scroll-driven target
+  // (or the integer targetLevel as a fallback). The loop runs permanently and
+  // only triggers a React update when the quantized value actually changes, so
+  // the scene re-renders smoothly while scrolling and goes idle when settled.
   useEffect(() => {
     let raf: number | undefined;
     let cancelled = false;
 
     const ease = () => {
+      if (cancelled) return;
+      const target = scrollTargetRef?.current ?? targetLevel;
       const prev = levelFloatRef.current;
-      const diff = targetLevel - prev;
+      const diff = target - prev;
 
-      if (Math.abs(diff) < 0.02) {
-        if (prev !== targetLevel) {
-          levelFloatRef.current = targetLevel;
-          setLevelFloat(targetLevel);
-        }
-        return;
+      if (Math.abs(diff) >= 0.0005) {
+        const nextPrecise = prev + diff * 0.12;
+        levelFloatRef.current = nextPrecise;
+        const q = Math.round(nextPrecise * 50) / 50;
+        setLevelFloat((cur) => (cur !== q ? q : cur));
       }
 
-      const nextPrecise = prev + diff * 0.12;
-      levelFloatRef.current = nextPrecise;
-      setLevelFloat(Math.round(nextPrecise * 50) / 50);
-
-      if (cancelled) return;
       raf = requestAnimationFrame(ease);
     };
 
@@ -667,7 +671,7 @@ export function Scene({
       cancelled = true;
       if (raf !== undefined) cancelAnimationFrame(raf);
     };
-  }, [targetLevel]);
+  }, [targetLevel, scrollTargetRef]);
   const quality = useQuality();
   const isMobile = quality === "mobile";
   
