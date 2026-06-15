@@ -401,7 +401,7 @@ function DieBondFingers({ dieHX, dieHZ, opacity }: { dieHX: number; dieHZ: numbe
   useEffect(() => {
     const dummy = new THREE.Object3D();
     data.forEach((f, i) => {
-      dummy.position.set(f.x, -0.5, f.z);
+      dummy.position.set(f.x, -0.1, f.z);
       dummy.rotation.set(0, f.rot, 0);
       dummy.updateMatrix();
       ref.current.setMatrixAt(i, dummy.matrix);
@@ -422,7 +422,7 @@ function DieBondWires({ dieHX, dieHZ, opacity }: { dieHX: number; dieHZ: number;
     const tubes: THREE.TubeGeometry[] = [];
     const add = (x1: number, z1: number, x2: number, z2: number) => {
       const start = new THREE.Vector3(x1, 0.06, z1);
-      const end = new THREE.Vector3(x2, -0.46, z2);
+      const end = new THREE.Vector3(x2, -0.12, z2);
       const mid = new THREE.Vector3((x1 + x2) / 2, 0.55, (z1 + z2) / 2);
       const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
       tubes.push(new THREE.TubeGeometry(curve, 12, 0.024, 5, false));
@@ -444,6 +444,50 @@ function DieBondWires({ dieHX, dieHZ, opacity }: { dieHX: number; dieHZ: number;
   return (
     <mesh geometry={geo}>
       <meshStandardMaterial color="#e7c270" emissive="#d4af37" emissiveIntensity={0.5 * opacity} metalness={1} roughness={0.22} transparent opacity={opacity} />
+    </mesh>
+  );
+}
+
+/* =========================================================================
+   POWER-ON: an ignition ripple sweeps across the die surface, synced with the
+   light climbing the package pins. Fades out (uBoot) as you scroll to Chapter 2.
+   ========================================================================= */
+function DieIgnitionRing({ dieW, dieD, boot }: { dieW: number; dieD: number; boot: number }) {
+  const bootR = useRef(boot);
+  bootR.current = boot;
+  const uniforms = useMemo(
+    () => ({ uTime: { value: 0 }, uBoot: { value: boot }, uColor: { value: new THREE.Color("#ffd98a") } }),
+    [],
+  );
+  useFrame((st) => {
+    uniforms.uTime.value = st.clock.getElapsedTime();
+    uniforms.uBoot.value = bootR.current;
+  });
+
+  if (boot <= 0.001) return null;
+  return (
+    <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[dieW, dieD]} />
+      <shaderMaterial
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        uniforms={uniforms}
+        vertexShader={"varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }"}
+        fragmentShader={
+          "uniform float uTime; uniform float uBoot; uniform vec3 uColor; varying vec2 vUv;" +
+          "void main(){" +
+          "  vec2 p = vUv - 0.5; float d = length(p) * 2.0;" +
+          "  float r = fract(uTime * 0.32);" +
+          "  float ring = smoothstep(0.07, 0.0, abs(d - r)) * (1.0 - r);" +
+          "  float r2 = fract(uTime * 0.32 + 0.5);" +
+          "  ring += smoothstep(0.07, 0.0, abs(d - r2)) * (1.0 - r2) * 0.6;" +
+          "  float mask = smoothstep(1.0, 0.55, d);" +
+          "  float a = ring * mask * uBoot * 0.85;" +
+          "  gl_FragColor = vec4(uColor, a);" +
+          "}"
+        }
+      />
     </mesh>
   );
 }
@@ -659,15 +703,6 @@ function Die({ visMode, opacity = 1 }: { visMode: string; opacity?: number }) {
       ))}
       {/* Die-edge realism: bond pads, double seal ring, alignment crosses, die ID */}
       <DieSurfaceMarks dieW={dieW} dieD={dieD} opacity={opacity} />
-
-      {/* Decap look: dense gold bond wires + finger comb from die to package.
-          Replaces the gull-wing legs. Desktop only (merged-tube geometry). */}
-      {!isMobile && (
-        <>
-          <DieBondFingers dieHX={dieW / 2} dieHZ={dieD / 2} opacity={opacity} />
-          <DieBondWires dieHX={dieW / 2} dieHZ={dieD / 2} opacity={opacity} />
-        </>
-      )}
     </group>
   );
 }
@@ -906,8 +941,15 @@ export function Scene({
   // In Chapter 1, the chip sits at -0.5 units height, visible with 0.85 opacity.
   // As you scroll to Chapter 2, it slides up to 0 and becomes fully opaque.
   const chipProgress = Math.max(0, Math.min(1, levelFloat - 1.0));
-  const chipY = -0.5 * (1 - chipProgress); 
+  const chipY = -0.5 * (1 - chipProgress);
   const chipOpacity = 0.85 + 0.15 * chipProgress;
+
+  // Power-On boot effects (pin climb + die ignition ripple) fade out into Chapter 2.
+  const bootIntensity = Math.max(0, Math.min(1, 1 - (levelFloat - 1) * 1.6));
+
+  // Chapter 2 -> 3: the package base (substrate, pins, cavity, bond wires) sinks
+  // and dissolves, leaving just the silicon die + floorplan for Chapter 3 on.
+  const pkgT = Math.max(0, Math.min(1, (levelFloat - 2) / 0.9));
 
   // Dynamic fog arguments to prevent the chip from being hidden by the fog in Chapter 1 (camera at [0, 80, 100])
   const cameraDist = levelFloat <= 1.5 ? 135 : levelFloat <= 2.5 ? 60 : 50;
@@ -947,13 +989,25 @@ export function Scene({
         {/* Layer 1: Computer Shell (slides down & fades out) */}
         <ComputerCasing levelFloat={levelFloat} />
 
-        {/* Rainbow Datastreams flowing into the die on Chapter 1 */}
-        <RainbowDatastreams levelFloat={levelFloat} />
+        {/* Chapter 1 opening is now the Power-On sequence (pin climb + die
+            ignition ripple, below) instead of the random datastream packets. */}
 
         {/* Layer 2: Semiconductor SoC (slides up & fades in) */}
         <group position={[0, chipY, 0]}>
-          <PackageSubstrate opacity={chipOpacity} />
+          {/* Package assembly — sinks & dissolves on the way to Chapter 3 */}
+          <group position={[0, -pkgT * 5, 0]}>
+            <PackageSubstrate opacity={chipOpacity * (1 - pkgT)} />
+            {!isMobile && (
+              <>
+                <DieBondFingers dieHX={(DIE_W + 1.4) / 2} dieHZ={(DIE_D + 1.4) / 2} opacity={chipOpacity * (1 - pkgT)} />
+                <DieBondWires dieHX={(DIE_W + 1.4) / 2} dieHZ={(DIE_D + 1.4) / 2} opacity={chipOpacity * (1 - pkgT)} />
+              </>
+            )}
+          </group>
           <Die visMode={visMode} opacity={chipOpacity} />
+
+          {/* Power-On ignition ripple across the die (Chapter 1) */}
+          <DieIgnitionRing dieW={DIE_W + 1.4} dieD={DIE_D + 1.4} boot={bootIntensity} />
           
           {(() => {
             // The Library (level 4) auto-raises every block in a center-out ripple

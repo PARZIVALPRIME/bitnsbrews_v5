@@ -218,8 +218,8 @@ export function PackageSubstrate({ opacity = 1 }: { opacity?: number }) {
       {/* Gold fan-out escape routing (instanced — 1 draw call) */}
       <InstancedFanout traces={fanout} y={maskTopY + 0.012} opacity={opacity} />
 
-      {/* Laser-etched part marking near the front edge */}
-      <mesh position={[0, maskTopY + 0.02, dieHZ + 1.5]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* Laser-etched part marking on the package rim (clear of the cavity) */}
+      <mesh position={[0, maskTopY + 0.02, pkgHD - 1.0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[7.2, 1.5]} />
         <meshStandardMaterial map={marking} emissiveMap={marking} emissive="#ffffff" emissiveIntensity={0.5 * opacity} transparent opacity={0.92 * opacity} />
       </mesh>
@@ -240,8 +240,83 @@ export function PackageSubstrate({ opacity = 1 }: { opacity?: number }) {
       {/* Realistic 3D SMD Capacitors — instanced */}
       <InstancedCapacitors capacitors={capacitors} opacity={opacity} />
 
+      {/* Stepped die cavity + glass seal frame — the recessed well a decapped die sits in */}
+      <DieCavity dieHX={dieHX} dieHZ={dieHZ} opacity={opacity} />
+
       {/* PGA pin grid — dense upward gold pins across the package body (decap look) */}
       <InstancedPgaPins pkgHW={pkgHW} pkgHD={pkgHD} dieHX={dieHX} dieHZ={dieHZ} baseY={maskTopY} opacity={opacity} />
+    </group>
+  );
+}
+
+function DieCavity({ dieHX, dieHZ, opacity }: { dieHX: number; dieHZ: number; opacity: number }) {
+  // Concentric ledges descending from just under the die out to the package —
+  // reads as the recessed cavity / bond shelf a decapped die sits in.
+  // Each terrace steps down and out; tone darkens outward for depth separation.
+  const steps = [
+    { i: -0.2, o: 0.8, y: -0.14, c: "#1a1d26" },
+    { i: 0.7, o: 1.5, y: -0.30, c: "#12141b" },
+    { i: 1.4, o: 2.2, y: -0.46, c: "#0b0c11" },
+  ];
+  const h = 0.13;
+
+  // A rectangular ring frame built from 4 bars (no center overlap with the die).
+  const frame = (
+    ix: number,
+    iz: number,
+    ox: number,
+    oz: number,
+    y: number,
+    hh: number,
+    key: string,
+    color: string,
+    rough: number,
+    metal: number,
+    op: number,
+    emissive?: string,
+    emi?: number,
+  ) => {
+    const bars: { p: [number, number, number]; s: [number, number, number] }[] = [
+      { p: [0, y - hh / 2, -(iz + oz) / 2], s: [2 * ox, hh, oz - iz] },
+      { p: [0, y - hh / 2, (iz + oz) / 2], s: [2 * ox, hh, oz - iz] },
+      { p: [-(ix + ox) / 2, y - hh / 2, 0], s: [ox - ix, hh, 2 * iz] },
+      { p: [(ix + ox) / 2, y - hh / 2, 0], s: [ox - ix, hh, 2 * iz] },
+    ];
+    return bars.map((b, i) => (
+      <mesh key={`${key}-${i}`} position={b.p}>
+        <boxGeometry args={b.s} />
+        <meshStandardMaterial
+          color={color}
+          metalness={metal}
+          roughness={rough}
+          emissive={emissive ?? "#000000"}
+          emissiveIntensity={(emi ?? 0) * opacity}
+          transparent
+          opacity={op * opacity}
+        />
+      </mesh>
+    ));
+  };
+
+  return (
+    <group>
+      {steps.map((s, i) => (
+        <group key={`step-${i}`}>
+          {/* ceramic terrace */}
+          {frame(dieHX + s.i, dieHZ + s.i, dieHX + s.o, dieHZ + s.o, s.y, h, `c-${i}`, s.c, 0.5, 0.45, 1)}
+          {/* bright gold lip along the outer edge of each terrace — the detail
+              that separates the steps into clear concentric rings */}
+          {frame(dieHX + s.o - 0.16, dieHZ + s.o - 0.16, dieHX + s.o, dieHZ + s.o, s.y + 0.01, 0.035, `lip-${i}`, GOLD_BRIGHT, 0.16, 1, 0.95, GOLD, 0.55)}
+        </group>
+      ))}
+
+      {/* bright gold shelf rim at the die base (where bond wires land) */}
+      {frame(dieHX - 0.05, dieHZ - 0.05, dieHX + 0.2, dieHZ + 0.2, -0.04, 0.045, "rim", GOLD_BRIGHT, 0.14, 1, 1, GOLD, 0.7)}
+
+      {/* translucent teal glass seal wall around the cavity */}
+      {frame(dieHX + 2.4, dieHZ + 2.4, dieHX + 3.0, dieHZ + 3.0, 0.06, 0.6, "seal", "#1d3a44", 0.05, 0.1, 0.4, "#2aa0b0", 0.18)}
+      {/* bright edge on top of the glass so the seal frame clearly reads as glass */}
+      {frame(dieHX + 2.45, dieHZ + 2.45, dieHX + 2.95, dieHZ + 2.95, 0.1, 0.04, "seal-top", "#bfeaf2", 0.1, 0.2, 0.9, "#6fd8e6", 0.6)}
     </group>
   );
 }
@@ -266,13 +341,49 @@ function InstancedPgaPins({
   const headRef = useRef<THREE.InstancedMesh>(null!);
   const shaftH = 0.7;
 
+  // Power-On: a band of light climbs each pin, with a radial phase so the waves
+  // ripple outward across the whole pin field. Pure emissive add via onBeforeCompile.
+  const shaftGeo = useMemo(() => new THREE.CylinderGeometry(0.075, 0.075, shaftH, 10), [shaftH]);
+  const glow = useMemo(() => ({ uTime: { value: 0 }, uGlow: { value: new THREE.Color("#ffe1a0") } }), []);
+  const shaftMat = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({ color: GOLD_BRIGHT, emissive: GOLD, emissiveIntensity: 0.18, metalness: 1, roughness: 0.18, transparent: true });
+    m.onBeforeCompile = (s) => {
+      s.uniforms.uTime = glow.uTime;
+      s.uniforms.uGlow = glow.uGlow;
+      s.vertexShader = s.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying float vH;\nvarying float vDist;")
+        .replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>\n vH = (position.y + ${(shaftH / 2).toFixed(4)}) / ${shaftH.toFixed(4)};\n vDist = length(instanceMatrix[3].xz);`,
+        );
+      s.fragmentShader = s.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform float uTime;\nuniform vec3 uGlow;\nvarying float vH;\nvarying float vDist;")
+        .replace(
+          "#include <emissivemap_fragment>",
+          "#include <emissivemap_fragment>\n float p = fract(uTime * 0.5 - vDist * 0.045);\n float band = smoothstep(0.16, 0.0, abs(vH - p));\n totalEmissiveRadiance += uGlow * band * 2.5;",
+        );
+    };
+    return m;
+  }, [glow, shaftH]);
+  useFrame((st) => {
+    glow.uTime.value = st.clock.getElapsedTime();
+    shaftMat.opacity = opacity;
+  });
+
   const positions = useMemo(() => {
     const list: { x: number; z: number }[] = [];
-    const step = 1.9;
-    for (let x = -pkgHW + 1.3; x <= pkgHW - 1.3 + 0.01; x += step) {
-      for (let z = -pkgHD + 1.3; z <= pkgHD - 1.3 + 0.01; z += step) {
-        // Skip the central die cavity (die + escape routing + bond wires live there).
-        if (Math.abs(x) < dieHX + 2.6 && Math.abs(z) < dieHZ + 2.6) continue;
+    const step = 1.4;
+    // Centered lattice (i from -n..n) so the pin field is symmetric about the die
+    // — fixes the off-center grid that gave 3 columns on one side and 2 on the other.
+    const nx = Math.floor((pkgHW - 1.2) / step);
+    const nz = Math.floor((pkgHD - 1.2) / step);
+    for (let ix = -nx; ix <= nx; ix++) {
+      for (let iz = -nz; iz <= nz; iz++) {
+        const x = ix * step;
+        const z = iz * step;
+        // Skip the central die cavity (die + steps + seal frame + bond wires);
+        // the +3.4 clearance keeps the innermost pins clear of the glass frame.
+        if (Math.abs(x) < dieHX + 3.4 && Math.abs(z) < dieHZ + 3.4) continue;
         list.push({ x, z });
       }
     }
@@ -305,11 +416,8 @@ function InstancedPgaPins({
         <cylinderGeometry args={[0.24, 0.28, 0.1, 12]} />
         <meshStandardMaterial color="#b8923e" metalness={1} roughness={0.32} transparent opacity={opacity} />
       </instancedMesh>
-      {/* upward pin shaft */}
-      <instancedMesh ref={shaftRef} args={[undefined, undefined, positions.length]}>
-        <cylinderGeometry args={[0.075, 0.075, shaftH, 10]} />
-        <meshStandardMaterial color={GOLD_BRIGHT} emissive={GOLD} emissiveIntensity={0.18} metalness={1} roughness={0.18} transparent opacity={opacity} />
-      </instancedMesh>
+      {/* upward pin shaft — climbing-light shader (Power-On) */}
+      <instancedMesh ref={shaftRef} args={[shaftGeo, shaftMat, positions.length]} />
       {/* rounded pin tip */}
       <instancedMesh ref={headRef} args={[undefined, undefined, positions.length]}>
         <sphereGeometry args={[0.11, 10, 8]} />
