@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { getComponent, getArticle } from "./articles";
+import { useRouter } from "next/navigation";
+import { getComponent, getArticle, getArticleSlug } from "./articles";
 import { DOMAIN_ACCENTS } from "./soc/data";
 
 interface ComponentPortalProps {
@@ -121,6 +122,7 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
   const [closing, setClosing] = useState(false);
   const [hoveredStep, setHoveredStep] = useState<number | null>(null);
   const comp = getComponent(componentId);
+  const router = useRouter();
 
   useEffect(() => {
     // A slightly longer timeout guarantees the browser registers the mounting state
@@ -146,6 +148,14 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
   const basicArticle = getArticle(comp.basicArticleId);
   const advancedArticle = getArticle(comp.advancedArticleId);
   const accent = ACCENTS[comp.id] ?? "#8aa9ff";
+
+  // A migrated article opens its real /articles/<slug> page; everything else
+  // still uses the in-experience overlay reader.
+  const handleRead = (id: string) => {
+    const slug = getArticleSlug(id);
+    if (slug) router.push(`/articles/${slug}`);
+    else onReadArticle(id);
+  };
 
   return (
     <div
@@ -231,7 +241,7 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
             {/* Step 1 — basics */}
             {basicArticle ? (
               <button
-                onClick={() => onReadArticle(basicArticle.id)}
+                onClick={() => handleRead(basicArticle.id)}
                 onMouseEnter={() => setHoveredStep(1)}
                 onMouseLeave={() => setHoveredStep(null)}
                 className="group rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 text-left transition-all duration-300"
@@ -272,7 +282,7 @@ export function ComponentPortal({ componentId, onClose, onReadArticle }: Compone
             {/* Step 2 — advanced track */}
             {advancedArticle ? (
               <button
-                onClick={() => onReadArticle(advancedArticle.id)}
+                onClick={() => handleRead(advancedArticle.id)}
                 onMouseEnter={() => setHoveredStep(2)}
                 onMouseLeave={() => setHoveredStep(null)}
                 className="group rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 text-left transition-all duration-300"

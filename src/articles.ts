@@ -658,6 +658,17 @@ export function getArticle(id: string): Article | undefined {
   return ARTICLES.find((a) => a.id === id);
 }
 
+// Maps an in-experience article id to its published MDX page slug. When an entry
+// exists, the die portal links to the real /articles/<slug> page instead of the
+// in-experience overlay reader. Add a line here each time an article is migrated.
+export const ARTICLE_SLUGS: Record<string, string> = {
+  "miss-rate": "global-vs-local-miss-rate",
+};
+
+export function getArticleSlug(id: string): string | undefined {
+  return ARTICLE_SLUGS[id];
+}
+
 export const ARTICLE_BLOCK_IDS = new Set(COMPONENTS.map((c) => c.id));
 
 export interface BlockTrack {
