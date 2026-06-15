@@ -458,6 +458,7 @@ function InstancedFanout({
   );
 }
 
+/*
 function InstancedSolderBalls({ positions, opacity }: { positions: THREE.Vector3[]; opacity: number }) {
   const ref = useRef<THREE.InstancedMesh>(null!);
 
@@ -478,6 +479,7 @@ function InstancedSolderBalls({ positions, opacity }: { positions: THREE.Vector3
     </instancedMesh>
   );
 }
+*/
 
 function InstancedCapacitors({
   capacitors,

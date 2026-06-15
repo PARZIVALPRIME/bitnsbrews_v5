@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getComponent, getArticle } from "./articles";
 import { DOMAIN_ACCENTS } from "./soc/data";
-import { Footer } from "./components/Footer";
+
 
 interface ComponentPortalProps {
   componentId: string;

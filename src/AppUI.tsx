@@ -4,7 +4,7 @@ import { PerformanceMonitor } from "@react-three/drei";
 import { QualityContext } from "./soc/quality";
 import { CHAPTERS, TOTAL } from "./chapters";
 import { getArticleForLevel, parseMarkdown } from "./chapterArticles";
-import { TRACKS, getTrackArticle } from "./trackArticles";
+import { TRACKS } from "./trackArticles";
 import { getArticle } from "./articles";
 import { Footer } from "./components/Footer";
 import { BLOCKS } from "./soc/data";
@@ -25,6 +25,9 @@ interface SceneProps {
   mode: "Idle";
   targetLevel: number;
   visMode: string;
+  uiTransitionRef?: React.MutableRefObject<{
+    onUpdate: (levelFloat: number) => void;
+  } | null>;
 }
 
 interface UiProps {
@@ -43,11 +46,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   const [chapterVisible, setChapterVisible] = useState(true); // text fade state
   const [t, setT] = useState(0.0);
   const [visMode] = useState("physical");
-  const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+  // const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [subscribed, setSubscribed] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  // const [email, setEmail] = useState("");
+  // const [subscribed, setSubscribed] = useState(false);
+  // const [submitting, setSubmitting] = useState(false);
   const [hubAtBottom, setHubAtBottom] = useState(false);
   const [activeTrackPageId, setActiveTrackPageId] = useState<string | null>(null);
 
@@ -66,7 +69,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
   // Performance scaling settings
   const [perfMode, setPerfMode] = useState<"high" | "low">("high");
-  const [autoDowngraded, setAutoDowngraded] = useState(false);
+  // const [autoDowngraded, setAutoDowngraded] = useState(false);
   const [showPerfPrompt, setShowPerfPrompt] = useState(false);
 
   // Branded boot screen — covers shader compilation / first-frame jank.
@@ -99,6 +102,8 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
     // Parallax displacements (max 6px)
     const mx = 0; // mouse.current.x * 6;
     const my = 0; // mouse.current.y * 6;
+
+
 
     // 1. Chapter 1 Hero Panel
     if (heroPanelRef.current) {
@@ -185,7 +190,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
 
     if (isLowRam || isLowGpu) {
       setPerfMode("low");
-      setAutoDowngraded(true);
+      // setAutoDowngraded(true);
     }
   }, []);
 
@@ -206,7 +211,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
         console.log("Dynamic FPS measured:", fps);
         if (fps < 45 && !checked) {
           setPerfMode("low");
-          setAutoDowngraded(true);
+          // setAutoDowngraded(true);
           checked = true;
         }
       } else {
@@ -219,11 +224,11 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   }, []);
 
   useEffect(() => {
-    setSelectedTrack(null);
+    // setSelectedTrack(null);
     setSelectedBlock(null);
     setHubAtBottom(false);
-    setSubscribed(false);
-    setEmail("");
+    // setSubscribed(false);
+    // setEmail("");
 
   }, [targetLevel]);
 
@@ -384,6 +389,8 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0b0d12] font-sans text-white select-none">
 
+
+
       {/* ── 3D Canvas ─────────────────────────────────────────────────────── */}
       <div className="absolute inset-0 z-1">
         <Canvas
@@ -492,7 +499,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
               onClick={() => {
                 const nextMode = perfMode === "high" ? "low" : "high";
                 setPerfMode(nextMode);
-                setAutoDowngraded(false);
+                // setAutoDowngraded(false);
                 setShowPerfPrompt(false);
               }}
               className="text-[10px] font-mono font-medium tracking-wider text-white/50 hover:text-white transition-colors duration-200 border border-white/8 hover:border-white/20 px-3.5 py-2 rounded-lg cursor-pointer bg-[#12151d]/90 shadow-sm"
@@ -615,7 +622,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
           return lvl ? getArticleForLevel(lvl) : getArticleForLevel(3);
         })();
 
-        const isVisible = chapterVisible;
+
 
         return (
           <div
@@ -663,7 +670,7 @@ export function AppUI({ sceneComponent: SceneComp, quality: _quality = "desktop"
               }}
               tabIndex={0}
             >
-              Open details for {block.label}
+              Open details for {block.name}
             </button>
           ))}
         </div>

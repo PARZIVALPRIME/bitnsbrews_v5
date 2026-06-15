@@ -19,10 +19,11 @@ import {
   ComputerCasing,
   PackageSubstrate,
 } from "./ProceduralModels";
+import { ThreeMotherboard } from "./ThreeMotherboard";
 
 // Physical copper-gold tone for metal interconnect (vias, buses, scribe rails).
 const AMBER = "#c79a4e";
-const DATASTREAM_COLORS = ["#ff007f", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#ec4899", "#06b6d4", "#f97316"];
+
 
 function getUtil(id: string, mode: SocMode): number {
   const table = UTILIZATION[id];
@@ -156,100 +157,9 @@ function DieInterconnects({ opacity }: { opacity: number }) {
   );
 }
 
-const _pinMat = new THREE.MeshStandardMaterial({
-  color: "#c79a4e", // copper-gold
-  emissive: "#c79a4e",
-  emissiveIntensity: 0.8,
-  metalness: 0.9,
-  roughness: 0.15,
-  transparent: true,
-});
 
-function DieIOPins({ dieW, dieD, opacity }: { dieW: number; dieD: number; opacity: number }) {
-  const ref = useRef<THREE.InstancedMesh>(null!);
-  const dummy = useMemo(() => new THREE.Object3D(), []);
 
-  const pinGeometry = useMemo(() => {
-    const shape = new THREE.Shape();
-    // Gull-wing profile shape: emerges horizontally, bends down, bends out for foot
-    shape.moveTo(0, 0);
-    shape.lineTo(0.3, 0);
-    shape.lineTo(0.3, -0.35);
-    shape.lineTo(0.5, -0.35);
-    shape.lineTo(0.5, -0.43);
-    shape.lineTo(0.2, -0.43);
-    shape.lineTo(0.2, -0.08);
-    shape.lineTo(0, -0.08);
-    shape.closePath();
 
-    const extrudeSettings = {
-      steps: 1,
-      depth: 0.14, // width of the pin along the die edge
-      bevelEnabled: true,
-      bevelThickness: 0.015,
-      bevelSize: 0.01,
-      bevelSegments: 2,
-    };
-
-    const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    geo.center(); // Center at [0, 0, 0]
-    return geo;
-  }, []);
-
-  const pinsData = useMemo(() => {
-    const list: { pos: THREE.Vector3; rot: THREE.Euler }[] = [];
-    const step = 0.35; // dense step
-    const yPos = -0.215; // aligns top face of pin with die top face (Y=0)
-    const xOffset = 0.25; // centers the pin horizontally relative to the edge
-
-    // Top edge (pointing towards -Z)
-    for (let x = -dieW / 2 + 0.35; x <= dieW / 2 - 0.35; x += step) {
-      list.push({
-        pos: new THREE.Vector3(x, yPos, -dieD / 2 - xOffset),
-        rot: new THREE.Euler(0, Math.PI / 2, 0),
-      });
-    }
-    // Bottom edge (pointing towards +Z)
-    for (let x = -dieW / 2 + 0.35; x <= dieW / 2 - 0.35; x += step) {
-      list.push({
-        pos: new THREE.Vector3(x, yPos, dieD / 2 + xOffset),
-        rot: new THREE.Euler(0, -Math.PI / 2, 0),
-      });
-    }
-    // Left edge (pointing towards -X)
-    for (let z = -dieD / 2 + 0.35; z <= dieD / 2 - 0.35; z += step) {
-      list.push({
-        pos: new THREE.Vector3(-dieW / 2 - xOffset, yPos, z),
-        rot: new THREE.Euler(0, Math.PI, 0),
-      });
-    }
-    // Right edge (pointing towards +X)
-    for (let z = -dieD / 2 + 0.35; z <= dieD / 2 - 0.35; z += step) {
-      list.push({
-        pos: new THREE.Vector3(dieW / 2 + xOffset, yPos, z),
-        rot: new THREE.Euler(0, 0, 0),
-      });
-    }
-    return list;
-  }, [dieW, dieD]);
-
-  useEffect(() => {
-    pinsData.forEach((item, i) => {
-      dummy.position.copy(item.pos);
-      dummy.rotation.copy(item.rot);
-      dummy.updateMatrix();
-      ref.current.setMatrixAt(i, dummy.matrix);
-    });
-    ref.current.instanceMatrix.needsUpdate = true;
-  }, [pinsData, dummy]);
-
-  useEffect(() => {
-    _pinMat.opacity = opacity;
-    _pinMat.needsUpdate = true;
-  }, [opacity]);
-
-  return <instancedMesh ref={ref} args={[pinGeometry, _pinMat, pinsData.length]} />;
-}
 
 /* =========================================================================
    DIE-EDGE REALISM: wire-bond pad ring, double seal ring, alignment crosses,
@@ -492,115 +402,7 @@ function DieIgnitionRing({ dieW, dieD, boot }: { dieW: number; dieD: number; boo
   );
 }
 
-function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
-  const quality = useQuality();
-  const streamCount = quality === "mobile" ? 16 : 36;
-  const streamVisible = levelFloat <= 1.8;
-  const opacityMultiplier = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.55); // fades out quickly
 
-  const packetRefs = useRef<THREE.Mesh[]>([]);
-  const packetPosition = useMemo(() => new THREE.Vector3(), []);
-
-  const paths = useMemo(() => {
-    const list = [];
-    const dieW = DIE_W + 1.4;
-    const dieD = DIE_D + 1.4;
-    for (let i = 0; i < streamCount; i++) {
-      const angle = (i / streamCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
-      const startR = 25 + Math.random() * 8;
-      const start = new THREE.Vector3(
-        Math.cos(angle) * startR,
-        6 + Math.random() * 6,
-        Math.sin(angle) * startR
-      );
-      // target: die perimeter
-      const endR_W = dieW / 2;
-      const endR_D = dieD / 2;
-      const end = new THREE.Vector3(
-        Math.cos(angle) * endR_W,
-        0.05,
-        Math.sin(angle) * endR_D
-      );
-      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-      mid.y += 4 + Math.random() * 5; // arched curve
-
-      const curve = new THREE.CatmullRomCurve3([start, mid, end]);
-      const points = curve.getPoints(30);
-      const positionBuffer = new Float32Array(points.length * 3);
-      points.forEach((point, pointIndex) => {
-        const offset = pointIndex * 3;
-        positionBuffer[offset] = point.x;
-        positionBuffer[offset + 1] = point.y;
-        positionBuffer[offset + 2] = point.z;
-      });
-      list.push({
-        curve,
-        color: DATASTREAM_COLORS[i % DATASTREAM_COLORS.length],
-        speed: 0.85 + Math.random() * 0.7, // much faster
-        offset: Math.random(),
-        positionBuffer,
-      });
-    }
-    return list;
-  }, [streamCount]);
-
-  useFrame((state) => {
-    if (!streamVisible) return;
-    const time = state.clock.getElapsedTime();
-
-    paths.forEach((path, i) => {
-      const tVal = (time * path.speed + path.offset) % 1.0;
-      const mesh = packetRefs.current[i];
-      if (mesh) {
-        path.curve.getPointAt(tVal, packetPosition);
-        mesh.position.copy(packetPosition);
-      }
-    });
-  });
-
-  if (!streamVisible) return null;
-
-  return (
-    <group>
-      {paths.map((path, i) => (
-        <group key={i}>
-          {/* Thin semi-transparent path line */}
-          <line>
-            <bufferGeometry attach="geometry">
-              <float32BufferAttribute
-                attach="attributes-position"
-                args={[path.positionBuffer, 3]}
-              />
-            </bufferGeometry>
-            <lineBasicMaterial
-              attach="material"
-              color={path.color}
-              transparent
-              opacity={0.08 * opacityMultiplier}
-              linewidth={1}
-            />
-          </line>
-
-          {/* Glowing packet sphere */}
-          <mesh
-            ref={(el) => {
-              if (el) packetRefs.current[i] = el;
-            }}
-          >
-            <sphereGeometry args={[0.11, 8, 8]} />
-            <meshStandardMaterial
-              color={path.color}
-              emissive={path.color}
-              emissiveIntensity={100.0 * opacityMultiplier}
-              transparent
-              opacity={opacityMultiplier}
-            />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
 
 /* =========================================================================
    DIE SUBSTRATE & BASE
@@ -755,7 +557,7 @@ function CameraController({
     const intensity = levelFloat <= 1.8 ? 1.5 : 2.8;
     const targetPX = mouse.current.x * intensity;
     const targetPY = mouse.current.y * intensity;
-    
+
     // Smoothly ease the parallax values to prevent sudden jumps
     parallax.current.x += (targetPX - parallax.current.x) * 0.04;
     parallax.current.y += (targetPY - parallax.current.y) * 0.04;
@@ -789,7 +591,7 @@ function Lights({ visMode, levelFloat }: { visMode: string; levelFloat: number }
   const quality = useQuality();
   const isMobile = quality === "mobile";
   const isThermal = visMode === "thermal";
-  
+
   // Spotlight intensity for chapter 1: Fades out as we scroll away from chapter 1 (levelFloat > 1.0)
   const spotlightIntensity = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.5) * 45.0;
 
@@ -871,10 +673,10 @@ function getStaggeredT(blockId: string, manualT: number): number {
   const dist = Math.sqrt(cx * cx + cz * cz);
   const maxDist = 11.5;
   const normDist = Math.min(1.0, dist / maxDist);
-  
+
   const delay = normDist * 0.45;
   const localT = Math.max(0, Math.min(1, (manualT - delay) / (1.0 - delay)));
-  
+
   return localT * localT * (3 - 2 * localT);
 }
 
@@ -923,7 +725,7 @@ export function Scene({
   }, [targetLevel]);
   const quality = useQuality();
   const isMobile = quality === "mobile";
-  
+
   // Rounded level for visual model activation boundaries
   const level = Math.round(levelFloat);
 
@@ -962,7 +764,7 @@ export function Scene({
       <fog attach="fog" args={["#08090e", fogStart, fogEnd]} />
 
       {/* GPU-accelerated atmospheric dust particles */}
-      <Particles count={isMobile ? 120 : 450} color="#c79a4e" levelFloat={levelFloat} />
+      <Particles count={levelFloat <= 1.5 ? 0 : (isMobile ? 120 : 450)} color="#c79a4e" levelFloat={levelFloat} />
 
       <Lights visMode={visMode} levelFloat={levelFloat} />
 
@@ -984,6 +786,8 @@ export function Scene({
         selectedBlockCoords={selectedBlockCoords}
         uiTransitionRef={uiTransitionRef}
       />
+
+      <ThreeMotherboard levelFloat={levelFloat} />
 
       <group onPointerMissed={() => setSelected(null)}>
         {/* Layer 1: Computer Shell (slides down & fades out) */}
@@ -1008,7 +812,7 @@ export function Scene({
 
           {/* Power-On ignition ripple across the die (Chapter 1) */}
           <DieIgnitionRing dieW={DIE_W + 1.4} dieD={DIE_D + 1.4} boot={bootIntensity} />
-          
+
           {(() => {
             // The Library (level 4) auto-raises every block in a center-out ripple
             // tied to the camera swoop. Ramps up entering 4, back down toward the Hub.
@@ -1051,7 +855,7 @@ export function Scene({
         // frames={1}: bake once at mount instead of re-rendering the whole scene
         // top-down every frame — one of the biggest hidden costs in high quality.
         <ContactShadows
-          position={[0, -1.58, 0]}
+          position={[0, -1.96, 0]}
           scale={52}
           resolution={512}
           blur={2.2}

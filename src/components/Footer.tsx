@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 interface FooterProps {
   onNavigateToDie?: () => void;
@@ -16,7 +16,7 @@ export function Footer({ onNavigateToDie, onNavigateToTracks }: FooterProps) {
       <div className="w-full border-t border-white/8 bg-[#12151d] mt-16 shrink-0 relative overflow-hidden">
         {/* Glowy Gradient Orb */}
         <div className="absolute top-[-50%] left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-r from-[#8aa9ff] to-[#5bd6a2] rounded-full blur-[100px] opacity-[0.08] pointer-events-none" />
-        
+
         <div className="max-w-[760px] mx-auto px-6 py-14 flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
           <div className="flex-1 text-left">
             <h2 className="article-serif text-[24px] font-semibold tracking-tight text-white/95 mb-2.5">
@@ -124,10 +124,10 @@ export function Footer({ onNavigateToDie, onNavigateToTracks }: FooterProps) {
             <a href="#" className="hover:text-[#8aa9ff] transition-colors uppercase">Terms</a>
           </div>
         </div>
-        
+
         {/* Bleeding Watermark */}
         <div className="absolute right-[-4%] bottom-[-20%] pointer-events-none select-none overflow-hidden z-0 flex items-end justify-end">
-          <span 
+          <span
             className="article-serif italic font-semibold text-white/[0.02] leading-none whitespace-nowrap"
             style={{ fontSize: "clamp(120px, 15vw, 150px)" }}
           >
