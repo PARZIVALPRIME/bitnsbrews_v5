@@ -468,7 +468,7 @@ function CameraController({
     onUpdate: (levelFloat: number) => void;
   } | null>;
 }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const targetRef = useRef(new THREE.Vector3(0, 1.5, 0));
   const driftRef = useRef(new THREE.Vector3());
   const finalPosRef = useRef(new THREE.Vector3());
@@ -517,7 +517,20 @@ function CameraController({
 
     const persCam = camera as THREE.PerspectiveCamera;
     if (persCam.isPerspectiveCamera) {
-      persCam.fov += (targetParams.fov - persCam.fov) * 0.05;
+      // Aspect-aware framing: on portrait/narrow viewports (phones) widen the
+      // vertical FOV so the wide die still fits horizontally instead of being
+      // cropped. Preserves the horizontal coverage the desktop layout was tuned
+      // for (REF_ASPECT); clamped to avoid extreme wide-angle distortion.
+      const REF_ASPECT = 1.6;
+      const aspect = size.width / Math.max(1, size.height);
+      let fovTarget = targetParams.fov;
+      if (aspect < REF_ASPECT) {
+        const vRef = THREE.MathUtils.degToRad(targetParams.fov);
+        const hRef = 2 * Math.atan(Math.tan(vRef / 2) * REF_ASPECT);
+        const vNew = 2 * Math.atan(Math.tan(hRef / 2) / aspect);
+        fovTarget = Math.min(82, THREE.MathUtils.radToDeg(vNew));
+      }
+      persCam.fov += (fovTarget - persCam.fov) * 0.05;
       persCam.updateProjectionMatrix();
     }
 

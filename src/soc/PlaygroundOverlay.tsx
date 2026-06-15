@@ -32,6 +32,27 @@ function CameraController({ cameraRef }: { cameraRef: React.MutableRefObject<THR
   return null;
 }
 
+// Widen the FOV on portrait/narrow viewports so the wide die fits horizontally.
+function AspectFov() {
+  const { camera, size } = useThree();
+  useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    if (!cam.isPerspectiveCamera) return;
+    const REF_ASPECT = 1.6;
+    const BASE = 25;
+    const aspect = size.width / Math.max(1, size.height);
+    let fov = BASE;
+    if (aspect < REF_ASPECT) {
+      const vRef = THREE.MathUtils.degToRad(BASE);
+      const hRef = 2 * Math.atan(Math.tan(vRef / 2) * REF_ASPECT);
+      fov = Math.min(82, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hRef / 2) / aspect)));
+    }
+    cam.fov = fov;
+    cam.updateProjectionMatrix();
+  }, [camera, size]);
+  return null;
+}
+
 export function PlaygroundOverlay({
   onClose,
   quality = "desktop"
@@ -100,13 +121,14 @@ export function PlaygroundOverlay({
             <Suspense fallback={null}>
               <PlaygroundScene t={t} showLabels={showLabels} selected={selected} setSelected={setSelected} mode={mode} />
               <CameraController cameraRef={cameraRef} />
+              <AspectFov />
             </Suspense>
           </QualityContext.Provider>
         </Canvas>
       </div>
 
       {/* ───── Top bar: logo + modes + view toggle + close ───── */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-20 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-gradient-to-b from-black/80 to-transparent">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div>
@@ -119,13 +141,13 @@ export function PlaygroundOverlay({
           </div>
         </div>
 
-        {/* Mode switcher */}
-        <div className="flex items-center gap-0.5 rounded-lg border border-white/10 bg-[#12151d] p-0.5">
+        {/* Mode switcher — drops to its own full-width, scrollable row on mobile */}
+        <div className="order-last sm:order-none w-full sm:w-auto flex items-center justify-start sm:justify-center gap-0.5 rounded-lg border border-white/10 bg-[#12151d] p-0.5 overflow-x-auto scrollbar-none">
           {MODES.map((m) => (
             <button
               key={m.id}
               onClick={() => setMode(m.id)}
-              className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
+              className={`shrink-0 rounded-md px-2.5 sm:px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
                 mode === m.id
                   ? "bg-[#5b7cfa] text-white"
                   : "text-white/50 hover:text-white/80 hover:bg-white/[0.05]"
@@ -171,8 +193,8 @@ export function PlaygroundOverlay({
         </div>
       </div>
 
-      {/* ───── Left: legend ───── */}
-      <div className="absolute left-5 top-24 z-10 w-44 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]">
+      {/* ───── Left: legend (hidden on mobile to declutter) ───── */}
+      <div className="hidden sm:block absolute left-5 top-24 z-10 w-44 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.35),0_4px_12px_rgba(0,0,0,0.25)]">
         <div className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white/40">
           Domains
         </div>
@@ -191,7 +213,7 @@ export function PlaygroundOverlay({
 
       {/* ───── Right: diagnostics panel (only when a block is selected) ───── */}
       {sel && (
-        <div className="absolute right-5 top-24 z-10 w-72 rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] shadow-[0_2px_6px_rgba(0,0,0,0.4),0_12px_32px_rgba(0,0,0,0.35)] overflow-hidden">
+        <div className="absolute left-3 right-3 sm:left-auto sm:right-5 top-[88px] sm:top-24 z-10 w-auto sm:w-72 max-h-[52vh] sm:max-h-none overflow-y-auto sm:overflow-hidden rounded-xl border border-white/10 bg-[rgba(15,18,26,0.94)] shadow-[0_2px_6px_rgba(0,0,0,0.4),0_12px_32px_rgba(0,0,0,0.35)]">
           {/* header */}
           <div className="border-b border-white/8 p-4 pb-3">
             <div className="flex items-start justify-between">
