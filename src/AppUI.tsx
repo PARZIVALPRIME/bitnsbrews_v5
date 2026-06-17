@@ -7,6 +7,7 @@ import { getArticleForLevel, parseMarkdown } from "./chapterArticles";
 import { TRACKS, getTrackArticle } from "./trackArticles";
 import { getArticle } from "./articles";
 import { SiteFooter } from "./components/SiteFooter";
+import { CircuitBackground } from "./components/CircuitBackground";
 import { BLOCKS } from "./soc/data";
 import { ARTICLE_BLOCK_IDS } from "./articles";
 import { TrackIcon } from "./components/TrackIcon";
@@ -384,6 +385,15 @@ export function AppUI({ sceneComponent: SceneComp }: UiProps) {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0b0d12] font-sans text-white select-none">
+
+      {/* ── Circuit backdrop (SVG) ────────────────────────────────────────────
+          Sits behind the transparent 3D canvas. Shown on the lite tier in place
+          of the heavier 3D <ThreeMotherboard> (which runs on the high tier). */}
+      {perfMode === "low" && (
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <CircuitBackground />
+        </div>
+      )}
 
       {/* ── 3D Canvas ─────────────────────────────────────────────────────── */}
       <div className="absolute inset-0 z-1">

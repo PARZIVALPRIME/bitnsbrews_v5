@@ -19,6 +19,7 @@ import {
   ComputerCasing,
   PackageSubstrate,
 } from "./ProceduralModels";
+import { ThreeMotherboard } from "./ThreeMotherboard";
 
 // Physical copper-gold tone for metal interconnect (vias, buses, scribe rails).
 const AMBER = "#c79a4e";
@@ -878,8 +879,9 @@ export function Scene({
       {/* Transparent canvas background allows HTML circuit traces to show behind the 3D casing */}
       <fog attach="fog" args={["#08090e", fogStart, fogEnd]} />
 
-      {/* GPU-accelerated atmospheric dust particles */}
-      <Particles count={isMobile ? 120 : 450} color="#c79a4e" levelFloat={levelFloat} />
+      {/* GPU-accelerated atmospheric dust particles — off during the opening
+          (level ≤ 1.5) where the motherboard / circuit backdrop fills the space. */}
+      <Particles count={levelFloat <= 1.5 ? 0 : (isMobile ? 120 : 450)} color="#c79a4e" levelFloat={levelFloat} />
 
       <Lights visMode={visMode} levelFloat={levelFloat} />
 
@@ -901,6 +903,12 @@ export function Scene({
         selectedBlockCoords={selectedBlockCoords}
         uiTransitionRef={uiTransitionRef}
       />
+
+      {/* 3D motherboard the chip sits on (level-1 opening, fades out by ~1.6).
+          Desktop-only — it's a 500x500 textured plane + instanced traces +
+          animated packets; on mobile the cheap CircuitBackground SVG (in AppUI)
+          plays this role instead. */}
+      {!isMobile && <ThreeMotherboard levelFloat={levelFloat} />}
 
       <group onPointerMissed={() => setSelected(null)}>
         {/* Layer 1: Computer Shell (slides down & fades out) */}
@@ -968,7 +976,7 @@ export function Scene({
         // frames={1}: bake once at mount instead of re-rendering the whole scene
         // top-down every frame — one of the biggest hidden costs in high quality.
         <ContactShadows
-          position={[0, -1.58, 0]}
+          position={[0, -1.96, 0]}
           scale={52}
           resolution={512}
           blur={2.2}
