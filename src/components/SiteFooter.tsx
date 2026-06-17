@@ -76,11 +76,13 @@ export function SiteFooter() {
         </div>
       </div>
 
-      {/* Bleeding watermark */}
-      <div className="absolute right-[-4%] bottom-[-24%] pointer-events-none select-none overflow-hidden z-0 flex items-end justify-end">
+      {/* Bleeding watermark — a fixed-pixel bleed off the bottom-right edge so it
+          reads the same regardless of how tall the footer's content is. The
+          footer's own overflow-hidden does the clipping (the "bleed"). */}
+      <div className="absolute right-[-2%] bottom-[-2.25rem] sm:bottom-[-3rem] pointer-events-none select-none z-0">
         <span
-          className="article-serif italic font-semibold text-white/[0.015] leading-none whitespace-nowrap"
-          style={{ fontSize: "clamp(100px, 14vw, 150px)" }}
+          className="article-serif italic font-semibold text-white/[0.03] leading-none whitespace-nowrap block"
+          style={{ fontSize: "clamp(110px, 16vw, 190px)" }}
         >
           bits&apos;nbrews
         </span>

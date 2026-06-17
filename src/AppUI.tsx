@@ -277,10 +277,12 @@ export function AppUI({ sceneComponent: SceneComp }: UiProps) {
     };
 
     const nativeScrollEl = (target: EventTarget | null) => {
-      const el = target as HTMLElement | null;
-      return el
-        ? (el.closest(".overflow-y-auto, .overflow-y-scroll, .scrollbar-thin, input[type='range']") as HTMLElement | null)
-        : null;
+      // Guard against non-Element targets (e.g. window/document on programmatic
+      // events) — only Elements have .closest().
+      if (!(target instanceof Element)) return null;
+      return target.closest(
+        ".overflow-y-auto, .overflow-y-scroll, .scrollbar-thin, input[type='range']"
+      ) as HTMLElement | null;
     };
 
     // Inside the Hub (level 5) the catalog scrolls natively; we only re-capture
