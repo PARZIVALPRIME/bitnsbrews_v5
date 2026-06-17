@@ -22,7 +22,6 @@ import {
 
 // Physical copper-gold tone for metal interconnect (vias, buses, scribe rails).
 const AMBER = "#c79a4e";
-const DATASTREAM_COLORS = ["#ff007f", "#3b82f6", "#10b981", "#fbbf24", "#a855f7", "#ec4899", "#06b6d4", "#f97316"];
 
 function getUtil(id: string, mode: SocMode): number {
   const table = UTILIZATION[id];
@@ -249,116 +248,6 @@ function DieIOPins({ dieW, dieD, opacity }: { dieW: number; dieD: number; opacit
   }, [opacity]);
 
   return <instancedMesh ref={ref} args={[pinGeometry, _pinMat, pinsData.length]} />;
-}
-
-function RainbowDatastreams({ levelFloat }: { levelFloat: number }) {
-  const quality = useQuality();
-  const streamCount = quality === "mobile" ? 16 : 36;
-  const streamVisible = levelFloat <= 1.8;
-  const opacityMultiplier = Math.max(0, 1.0 - (levelFloat - 1.0) * 1.55); // fades out quickly
-
-  const packetRefs = useRef<THREE.Mesh[]>([]);
-  const packetPosition = useMemo(() => new THREE.Vector3(), []);
-
-  const paths = useMemo(() => {
-    const list = [];
-    const dieW = DIE_W + 1.4;
-    const dieD = DIE_D + 1.4;
-    for (let i = 0; i < streamCount; i++) {
-      const angle = (i / streamCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
-      const startR = 25 + Math.random() * 8;
-      const start = new THREE.Vector3(
-        Math.cos(angle) * startR,
-        6 + Math.random() * 6,
-        Math.sin(angle) * startR
-      );
-      // target: die perimeter
-      const endR_W = dieW / 2;
-      const endR_D = dieD / 2;
-      const end = new THREE.Vector3(
-        Math.cos(angle) * endR_W,
-        0.05,
-        Math.sin(angle) * endR_D
-      );
-      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-      mid.y += 4 + Math.random() * 5; // arched curve
-
-      const curve = new THREE.CatmullRomCurve3([start, mid, end]);
-      const points = curve.getPoints(30);
-      const positionBuffer = new Float32Array(points.length * 3);
-      points.forEach((point, pointIndex) => {
-        const offset = pointIndex * 3;
-        positionBuffer[offset] = point.x;
-        positionBuffer[offset + 1] = point.y;
-        positionBuffer[offset + 2] = point.z;
-      });
-      list.push({
-        curve,
-        color: DATASTREAM_COLORS[i % DATASTREAM_COLORS.length],
-        speed: 0.85 + Math.random() * 0.7, // much faster
-        offset: Math.random(),
-        positionBuffer,
-      });
-    }
-    return list;
-  }, [streamCount]);
-
-  useFrame((state) => {
-    if (!streamVisible) return;
-    const time = state.clock.getElapsedTime();
-
-    paths.forEach((path, i) => {
-      const tVal = (time * path.speed + path.offset) % 1.0;
-      const mesh = packetRefs.current[i];
-      if (mesh) {
-        path.curve.getPointAt(tVal, packetPosition);
-        mesh.position.copy(packetPosition);
-      }
-    });
-  });
-
-  if (!streamVisible) return null;
-
-  return (
-    <group>
-      {paths.map((path, i) => (
-        <group key={i}>
-          {/* Thin semi-transparent path line */}
-          <line>
-            <bufferGeometry attach="geometry">
-              <float32BufferAttribute
-                attach="attributes-position"
-                args={[path.positionBuffer, 3]}
-              />
-            </bufferGeometry>
-            <lineBasicMaterial
-              attach="material"
-              color={path.color}
-              transparent
-              opacity={0.08 * opacityMultiplier}
-              linewidth={1}
-            />
-          </line>
-
-          {/* Glowing packet sphere */}
-          <mesh
-            ref={(el) => {
-              if (el) packetRefs.current[i] = el;
-            }}
-          >
-            <sphereGeometry args={[0.11, 8, 8]} />
-            <meshStandardMaterial
-              color={path.color}
-              emissive={path.color}
-              emissiveIntensity={100.0 * opacityMultiplier}
-              transparent
-              opacity={opacityMultiplier}
-            />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
 }
 
 /* =========================================================================
@@ -1017,8 +906,8 @@ export function Scene({
         {/* Layer 1: Computer Shell (slides down & fades out) */}
         <ComputerCasing levelFloat={levelFloat} />
 
-        {/* Rainbow Datastreams flowing into the die on Chapter 1 */}
-        <RainbowDatastreams levelFloat={levelFloat} />
+        {/* The opening flourish is the Power-On sequence (pin climb + die
+            ignition ripple, below) — the old rainbow datastreams were dropped. */}
 
         {/* Layer 2: Semiconductor SoC (slides up & fades in) */}
         <group position={[0, chipY, 0]}>
