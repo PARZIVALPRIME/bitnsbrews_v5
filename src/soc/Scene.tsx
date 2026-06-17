@@ -905,10 +905,10 @@ export function Scene({
       />
 
       {/* 3D motherboard the chip sits on (level-1 opening, fades out by ~1.6).
-          Desktop-only — it's a 500x500 textured plane + instanced traces +
-          animated packets; on mobile the cheap CircuitBackground SVG (in AppUI)
-          plays this role instead. */}
-      {!isMobile && <ThreeMotherboard levelFloat={levelFloat} />}
+          Rendered on every tier so lite matches high; the CircuitBackground SVG
+          (in AppUI) sits layered behind it. Geometry is instanced and it fades
+          out by ~level 1.6, so the cost is bounded to the opening. */}
+      <ThreeMotherboard levelFloat={levelFloat} />
 
       <group onPointerMissed={() => setSelected(null)}>
         {/* Layer 1: Computer Shell (slides down & fades out) */}
